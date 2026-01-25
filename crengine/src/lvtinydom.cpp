@@ -8560,6 +8560,112 @@ void ldomElementWriter::onBodyExit()
         ldomNode * child = _element->getChildNode(_element->getChildCount()-1);
         child->initNodeStyle();
         child->initNodeRendMethod();
+        
+        // Now, find the first visible non-empty text node and create the actual ::first-letter element
+        // Use a depth-first search through the element's children (excluding pseudo elements)
+        ldomNode * topNode = _element;
+        ldomNode * n = topNode;
+        ldomNode * firstTextNode = NULL;
+        int firstLetterEndIndex = 0;
+        
+        if ( n && n->getChildCount() > 0 ) {
+            int index = 0;
+            n = n->getChildNode(index);
+            while ( true ) {
+                // Check the node only the first time we meet it (index == 0)
+                if ( index == 0 ) {
+                    // Skip pseudo elements
+                    if ( n->isText() ) {
+                        lString32 text = n->getText();
+                        if ( text.length() > 0 ) {
+                            // Found a non-empty text node, now find where the first letter ends
+                            int len = text.length();
+                            int i = 0;
+                            
+                            // Skip leading non-letter characters (spaces, punctuation, etc.)
+                            // until we find the first actual letter
+                            bool foundFirstLetter = false;
+                            while ( i < len ) {
+                                lUInt16 props = lGetCharProps(text[i]);
+                                if ( props & (CH_PROP_UPPER | CH_PROP_LOWER | CH_PROP_DIGIT | CH_PROP_SIGN) ) {
+                                    // Found the start of the first letter
+                                    foundFirstLetter = true;
+                                    i++;
+                                    break;
+                                }
+                                i++;
+                            }
+                            
+                            // Now grab any trailing modifiers/punctuation that are part of the first letter
+                            if ( foundFirstLetter ) {
+                                while ( i < len ) {
+                                    lUInt16 props = lGetCharProps(text[i]);
+                                    if ( props & (CH_PROP_MODIFIER | CH_PROP_PUNCT | CH_PROP_PUNCT_OPEN | CH_PROP_PUNCT_CLOSE) ) {
+                                        i++;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                firstTextNode = n;
+                                firstLetterEndIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    else if ( n->getNodeId() == el_pseudoElem ) {
+                        // Skip pseudo elements - don't descend into them
+                        // Jump to next sibling
+                        index = n->getNodeIndex() + 1;
+                        n = n->getParentNode();
+                        if ( n == topNode && index >= n->getChildCount() )
+                            break;
+                        continue;
+                    }
+                }
+                
+                // Process next child
+                if ( index < n->getChildCount() ) {
+                    n = n->getChildNode(index);
+                    index = 0;
+                    continue;
+                }
+                
+                // No more child, get back to parent and have it process our sibling
+                index = n->getNodeIndex() + 1;
+                n = n->getParentNode();
+                if ( n == topNode && index >= n->getChildCount() )
+                    break; // back to top node and all its children visited
+            }
+        }
+        
+        // If we found a first letter, create the ::first-letter pseudo element
+        if ( firstTextNode && firstLetterEndIndex > 0 ) {
+            // Insert the ::first-letter element at the beginning of the parent element
+            // (or after ::before if present)
+            int insertIndex = 0;
+            int nb_children = _element->getChildCount();
+            
+            // Check if there's a ::before element
+            for ( int i = 0; i < nb_children; i++ ) {
+                ldomNode * childNode = _element->getChildNode(i);
+                if ( childNode->getNodeId() == el_pseudoElem && childNode->hasAttribute(attr_Before) ) {
+                    insertIndex = i + 1;
+                    break;
+                }
+            }
+            
+            // Create the ::first-letter pseudo element
+            ldomNode * firstLetterElem = _element->insertChildElement( insertIndex, LXML_NS_NONE, el_pseudoElem );
+            
+            // Store the end index in the attribute value as a string
+            lString32 indexStr;
+            indexStr << fmt::decimal(firstLetterEndIndex);
+            firstLetterElem->setAttributeValue(LXML_NS_NONE, attr_FirstLetter, indexStr.c_str());
+            
+            // Init style and rend method
+            firstLetterElem->initNodeStyle();
+            firstLetterElem->initNodeRendMethod();
+        }
     }
 //    if ( _element->getStyle().isNull() ) {
 //        lString32 path;
