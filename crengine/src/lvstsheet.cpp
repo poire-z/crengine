@@ -317,12 +317,14 @@ enum LVCssSelectorPseudoElement
 {
     csspe_before = 1,   // ::before
     csspe_after  = 2,   // ::after
+    csspe_first_letter  = 3,   // ::first-letter
 };
 
 static const char * css_pseudo_elements[] =
 {
     "before",
     "after",
+    "first-letter",
     NULL
 };
 
