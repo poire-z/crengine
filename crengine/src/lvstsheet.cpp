@@ -6304,21 +6304,47 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
 {
     lUInt16 nodeId = node->getNodeId();
     if ( nodeId == el_pseudoElem ) {
-        if ( !_pseudo_elem ) { // not a ::before/after rule
+        if ( !_pseudo_elem ) { // not a ::before/after/first-letter rule
             // Our added pseudoElem element should not match any other rules
             // (if we added it as a child of a P element, it should not match P > *)
             return false;
         }
         else {
             // We might be the pseudoElem that was created by this selector.
-            // Start checking the rules starting from the real parent
-            // (except if this selector target a boxing element: we should
-            // stop unboxing at that boxing element).
-            if ( _id <= EL_BOXING_END && _id >= EL_BOXING_START )
-                node = node->getUnboxedParent(_id);
-            else
-                node = node->getUnboxedParent();
-            nodeId = node->getNodeId();
+            // For ::before/::after, start checking from the real parent.
+            // For ::first-letter, we need to loop through ancestors until we find
+            // one that matches, since the FirstLetter element can be a grandchild.
+            if ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) ) {
+                // This is a ::first-letter pseudo element
+                // Loop through ancestors to find the element that matches the selector
+                const ldomNode * ancestor = node->getParentNode();
+                while ( ancestor ) {
+                    lUInt16 ancestorId = ancestor->getNodeId();
+                    // Skip boxing nodes and pseudo elements
+                    if ( ancestorId == el_pseudoElem || ancestor->isBoxingNode() ) {
+                        ancestor = ancestor->getParentNode();
+                        continue;
+                    }
+                    // Check if this ancestor matches the selector
+                    node = ancestor;
+                    nodeId = ancestorId;
+                    break;
+                }
+                if ( !ancestor ) {
+                    // No matching ancestor found
+                    return false;
+                }
+            }
+            else {
+                // ::before/::after or FirstLetterHelper: check from the real parent
+                // (except if this selector target a boxing element: we should
+                // stop unboxing at that boxing element).
+                if ( _id <= EL_BOXING_END && _id >= EL_BOXING_START )
+                    node = node->getUnboxedParent(_id);
+                else
+                    node = node->getUnboxedParent();
+                nodeId = node->getNodeId();
+            }
         }
     }
     else if ( _id==0 && node->isBoxingNode() ) {
@@ -6923,7 +6949,8 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
     if ( node->getNodeId() == el_pseudoElem ) {
         if (    ( _pseudo_elem == csspe_before && node->hasAttribute(attr_Before) )
              || ( _pseudo_elem == csspe_after  && node->hasAttribute(attr_After)  )
-             || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetterHelper) ) ) {
+             || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetterHelper) )
+             || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) ) ) {
             target_style = style;
         }
     }
