@@ -915,7 +915,7 @@ public:
     // Ensure this node has a ::before/::after/::first-letter pseudo element as
     // child, creating it if needed and possible
     void ensurePseudoElement( bool is_before );
-    void ensurePseudoElement( lUInt16 attr_id );
+    void ensurePseudoElementFirstLetter( bool is_helper );
 
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
     bool applyNodeStylesheet();
@@ -2823,7 +2823,7 @@ class ldomElementWriter
     bool _stylesheetIsSet;
     bool _bodyEnterCalled;
     int _pseudoElementAfterChildIndex;
-    int _pseudoElementFirstLetterChildIndex;
+    int _pseudoElementFirstLetterHelperChildIndex;
     lUInt32 _flags;
     lUInt32 getFlags();
     void updateTocItem();

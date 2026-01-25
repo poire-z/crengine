@@ -5965,7 +5965,7 @@ static bool IS_FIRST_BODY = false;
 
 ldomElementWriter::ldomElementWriter(ldomDocument * document, lUInt16 nsid, lUInt16 id, ldomElementWriter * parent, bool insert_before_last_child)
     : _parent(parent), _document(document), _tocItem(NULL), _isBlock(true), _isSection(false),
-      _stylesheetIsSet(false), _bodyEnterCalled(false), _pseudoElementAfterChildIndex(-1), _pseudoElementFirstLetterChildIndex(-1)
+      _stylesheetIsSet(false), _bodyEnterCalled(false), _pseudoElementAfterChildIndex(-1), _pseudoElementFirstLetterHelperChildIndex(-1)
 {
     //logfile << "{c";
     _typeDef = _document->getElementTypePtr( id );
@@ -6184,14 +6184,14 @@ void ldomElementWriter::onBodyEnter()
                         child->initNodeStyle();
                         child->initNodeRendMethod();
                     }
-                    else if ( child->hasAttribute(attr_FirstLetter) ) {
-                        // For the "FirstLetter" pseudo element, we need to wait
+                    else if ( child->hasAttribute(attr_FirstLetterHelper) ) {
+                        // For the "FirstLetterHelper" pseudo element, we need to wait
                         // for all real children to be added, to move it
                         // as its right position (before ::after), to init its style
                         // and its rendering method.
                         // We'll do that in onBodyExit() when called for
                         // this node.
-                        _pseudoElementFirstLetterChildIndex = i;
+                        _pseudoElementFirstLetterHelperChildIndex = i;
                     }
                     else if ( child->hasAttribute(attr_After) ) {
                         // For the "After" pseudo element, we need to wait
@@ -6301,7 +6301,7 @@ void ldomNode::ensurePseudoElement( bool is_before ) {
 #endif
 }
 
-void ldomNode::ensurePseudoElement( lUInt16 attr_id ) {
+void ldomNode::ensurePseudoElementFirstLetter( bool is_helper ) {
 #if BUILD_LITE!=1
     if ( getNodeId() == el_DocFragment || getNodeId() == el_html ) {
         // These elements are top most and may get re-initNodeStyle() from
@@ -6314,12 +6314,12 @@ void ldomNode::ensurePseudoElement( lUInt16 attr_id ) {
     int insertChildIndex = -1;
     int nb_children = getChildCount();
     
-    if ( attr_id == attr_FirstLetter ) { // ::first-letter
-        // ::first-letter should be inserted after ::before (if present) but before ::after
+    if ( is_helper ) { // ::first-letter-helper
+        // ::first-letter-helper should be inserted after ::before (if present) but before ::after
         // Start by searching for the position
         insertChildIndex = nb_children; // default to end if no ::after found
         
-        // First, check if ::first-letter already exists
+        // First, check if ::first-letter-helper already exists
         for ( int i = 0; i < nb_children; i++ ) {
             ldomNode * child = getChildNode(i);
             // pseudoElem might have been wrapped by a inlineBox, autoBoxing, floatBox...
@@ -6328,7 +6328,7 @@ void ldomNode::ensurePseudoElement( lUInt16 attr_id ) {
                 unwrapped_child = unwrapped_child->getChildNode(0);
             
             if ( unwrapped_child && unwrapped_child->getNodeId() == el_pseudoElem ) {
-                if ( unwrapped_child->hasAttribute(attr_FirstLetter) ) {
+                if ( unwrapped_child->hasAttribute(attr_FirstLetterHelper) ) {
                     // Already there, no need to create it
                     insertChildIndex = -1;
                     break;
@@ -6348,7 +6348,7 @@ void ldomNode::ensurePseudoElement( lUInt16 attr_id ) {
         }
         else {
             ldomNode * pseudo = insertChildElement( insertChildIndex, LXML_NS_NONE, el_pseudoElem );
-            pseudo->setAttributeValue(LXML_NS_NONE, attr_id, U"");
+            pseudo->setAttributeValue(LXML_NS_NONE, attr_FirstLetterHelper, U"");
             // Same comment as for ::before/::after applies here
         }
     }
@@ -8540,16 +8540,16 @@ void ldomElementWriter::onBodyExit()
     if ( !_bodyEnterCalled ) {
         onBodyEnter();
     }
-    if ( _pseudoElementFirstLetterChildIndex >= 0 ) {
-        // First, move ::first-letter to its correct position (just before ::after if present)
+    if ( _pseudoElementFirstLetterHelperChildIndex >= 0 ) {
+        // First, move ::first-letter-helper to its correct position (just before ::after if present)
         int targetIndex = _element->getChildCount() - 1; // default to end
         if ( _pseudoElementAfterChildIndex >= 0 ) {
             // ::after exists, insert before it
             targetIndex = _element->getChildCount() - 1; // will be just before after
         }
-        if ( _pseudoElementFirstLetterChildIndex != targetIndex ) {
+        if ( _pseudoElementFirstLetterHelperChildIndex != targetIndex ) {
             // Not at the right position: move it there
-            _element->moveItemsTo( _element, _pseudoElementFirstLetterChildIndex, _pseudoElementFirstLetterChildIndex);
+            _element->moveItemsTo( _element, _pseudoElementFirstLetterHelperChildIndex, _pseudoElementFirstLetterHelperChildIndex);
             // After moving, we need to update the ::after index if it was set
             if ( _pseudoElementAfterChildIndex >= 0 ) {
                 // ::after is now at the end (index hasn't changed conceptually but first-letter moved)
@@ -8557,13 +8557,13 @@ void ldomElementWriter::onBodyExit()
             }
         }
         // Now that all the real children of this node have had their
-        // style set, we can init the style of the "FirstLetter" pseudo
+        // style set, we can init the style of the "FirstLetterHelper" pseudo
         // element, and its rend method as it has no children.
-        int firstLetterIndex = _element->getChildCount() - 1;
+        int firstLetterHelperIndex = _element->getChildCount() - 1;
         if ( _pseudoElementAfterChildIndex >= 0 ) {
-            firstLetterIndex = _element->getChildCount() - 2; // before ::after
+            firstLetterHelperIndex = _element->getChildCount() - 2; // before ::after
         }
-        ldomNode * child = _element->getChildNode(firstLetterIndex);
+        ldomNode * child = _element->getChildNode(firstLetterHelperIndex);
         child->initNodeStyle();
         child->initNodeRendMethod();
     }

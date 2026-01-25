@@ -4169,7 +4169,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 // BiDi stuff had to be outputed first, before any pseudo element
                 // (if <q dir="rtl">...</q>, the added quote (first child pseudo element)
                 // should be inside the RTL bidi isolation.
-                if ( nodeElementId == el_pseudoElem ) {
+                if ( nodeElementId == el_pseudoElem && (enode->hasAttribute(attr_Before) || enode->hasAttribute(attr_After)) ) {
                     lString32 content = get_applied_content_property(enode);
                     if ( !content.empty() ) {
                         int em = font->getSize();
@@ -11393,7 +11393,7 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // See if applying styles requires pseudo element before/after
     bool requires_pseudo_element_before = false;
     bool requires_pseudo_element_after = false;
-    bool requires_pseudo_element_first_letter = false;
+    bool requires_pseudo_element_first_letter_helper = false;
     if ( pstyle->pseudo_elem_before_style ) {
         if ( pstyle->pseudo_elem_before_style->display != css_d_none
                 && pstyle->pseudo_elem_before_style->content.length() > 0
@@ -11416,16 +11416,16 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
         delete pstyle->pseudo_elem_after_style;
         pstyle->pseudo_elem_after_style = NULL;
     }
-    if ( pstyle->pseudo_elem_first_letter_style ) {
-        if ( pstyle->pseudo_elem_first_letter_style->display != css_d_none ) {
+    if ( pstyle->pseudo_elem_first_letter_helper_style ) {
+        if ( pstyle->pseudo_elem_first_letter_helper_style->display != css_d_none ) {
             // Not "display: none": this pseudo element can be generated
-            requires_pseudo_element_first_letter = true;
+            requires_pseudo_element_first_letter_helper = true;
         }
-        delete pstyle->pseudo_elem_first_letter_style;
-        pstyle->pseudo_elem_first_letter_style = NULL;
+        delete pstyle->pseudo_elem_first_letter_helper_style;
+        pstyle->pseudo_elem_first_letter_helper_style = NULL;
     }
 
-    if ( nodeElementId == el_pseudoElem ) {
+    if ( nodeElementId == el_pseudoElem && (enode->hasAttribute(attr_Before) || enode->hasAttribute(attr_After)) ) {
         // Pseudo element ->content may need some update if it contains
         // any of the open-quote-like tokens, to account for the
         // quoting nested levels. setNodeStyle() is actually the good
@@ -11454,8 +11454,8 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // are there as children, creating them if needed and possible
     if ( requires_pseudo_element_before )
         enode->ensurePseudoElement(true);
-    if ( requires_pseudo_element_first_letter )
-        enode->ensurePseudoElement(attr_FirstLetter);
+    if ( requires_pseudo_element_first_letter_helper )
+        enode->ensurePseudoElementFirstLetter(true);
     if ( requires_pseudo_element_after )
         enode->ensurePseudoElement(false);
 
@@ -12241,7 +12241,7 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
             text = node->getText();
             parent = node->getParentNode();
         }
-        else if ( node->getNodeId() == el_pseudoElem ) {
+        else if ( node->getNodeId() == el_pseudoElem && (node->hasAttribute(attr_Before) || node->hasAttribute(attr_After)) ) {
             text = get_applied_content_property(node);
             parent = node; // this pseudoElem node carries the font and style of the text
             if ( isStartNode ) {
