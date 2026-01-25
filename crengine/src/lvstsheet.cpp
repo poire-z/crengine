@@ -6325,10 +6325,15 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
                         ancestor = ancestor->getParentNode();
                         continue;
                     }
-                    // Check if this ancestor matches the selector
-                    node = ancestor;
-                    nodeId = ancestorId;
-                    break;
+                    // Check if this ancestor matches the selector's element requirement
+                    if ( _id == 0 || ancestorId == _id ) {
+                        // This ancestor matches (or selector has no element requirement)
+                        node = ancestor;
+                        nodeId = ancestorId;
+                        break;
+                    }
+                    // Continue to next ancestor
+                    ancestor = ancestor->getParentNode();
                 }
                 if ( !ancestor ) {
                     // No matching ancestor found
