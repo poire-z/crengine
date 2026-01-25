@@ -8640,22 +8640,12 @@ void ldomElementWriter::onBodyExit()
         
         // If we found a first letter, create the ::first-letter pseudo element
         if ( firstTextNode && firstLetterEndIndex > 0 ) {
-            // Insert the ::first-letter element at the beginning of the parent element
-            // (or after ::before if present)
-            int insertIndex = 0;
-            int nb_children = _element->getChildCount();
+            // Insert the ::first-letter element as an immediate preceding sibling of the text node
+            ldomNode * textNodeParent = firstTextNode->getParentNode();
+            int textNodeIndex = firstTextNode->getNodeIndex();
             
-            // Check if there's a ::before element
-            for ( int i = 0; i < nb_children; i++ ) {
-                ldomNode * childNode = _element->getChildNode(i);
-                if ( childNode->getNodeId() == el_pseudoElem && childNode->hasAttribute(attr_Before) ) {
-                    insertIndex = i + 1;
-                    break;
-                }
-            }
-            
-            // Create the ::first-letter pseudo element
-            ldomNode * firstLetterElem = _element->insertChildElement( insertIndex, LXML_NS_NONE, el_pseudoElem );
+            // Create the ::first-letter pseudo element at the position just before the text node
+            ldomNode * firstLetterElem = textNodeParent->insertChildElement( textNodeIndex, LXML_NS_NONE, el_pseudoElem );
             
             // Store the end index in the attribute value as a string
             lString32 indexStr;
