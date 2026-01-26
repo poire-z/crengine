@@ -915,7 +915,7 @@ public:
     // Ensure this node has a ::before/::after/::first-letter pseudo element as
     // child, creating it if needed and possible
     void ensurePseudoElement( bool is_before );
-    void ensurePseudoElementFirstLetter( bool is_helper );
+    void ensureHasFirstLetterAttribute();
 
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
     bool applyNodeStylesheet();

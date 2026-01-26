@@ -6317,18 +6317,18 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
             if ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) ) {
                 // This is a ::first-letter pseudo element
                 // Loop through ancestors to find the element that matches the FULL selector
-                const ldomNode * ancestor = node->getParentNode();
+                const ldomNode * ancestor = node->getUnboxedParent();
                 while ( ancestor ) {
                     lUInt16 ancestorId = ancestor->getNodeId();
-                    // Skip boxing nodes and pseudo elements
-                    if ( ancestorId == el_pseudoElem || ancestor->isBoxingNode() ) {
-                        ancestor = ancestor->getParentNode();
+                    // Skip pseudo elements
+                    if ( ancestorId == el_pseudoElem ) {
+                        ancestor = ancestor->getUnboxedParent();
                         continue;
                     }
                     // Check if this ancestor matches the selector's element requirement
                     if ( _id != 0 && ancestorId != _id ) {
                         // Element name doesn't match, try next ancestor
-                        ancestor = ancestor->getParentNode();
+                        ancestor = ancestor->getUnboxedParent();
                         continue;
                     }
                     // Element name matches (or no element requirement), now check additional rules
@@ -6355,7 +6355,6 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
                         }
                         rule = rule->getNext();
                     } while (rule != NULL);
-                    
                     if ( all_rules_match ) {
                         // This ancestor matches the full selector
                         node = ancestor;
@@ -6363,7 +6362,7 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
                         break;
                     }
                     // This ancestor doesn't match, try next one
-                    ancestor = ancestor->getParentNode();
+                    ancestor = ancestor->getUnboxedParent();
                 }
                 if ( !ancestor ) {
                     // No matching ancestor found
@@ -7008,10 +7007,10 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
             target_style = style->pseudo_elem_after_style;
         }
         else if ( _pseudo_elem == csspe_first_letter ) {
-            if ( !style->pseudo_elem_first_letter_helper_style ) {
-                style->pseudo_elem_first_letter_helper_style = new css_style_rec_t;
+            if ( !style->pseudo_elem_first_letter_catcher_style ) {
+                style->pseudo_elem_first_letter_catcher_style = new css_style_rec_t;
             }
-            target_style = style->pseudo_elem_first_letter_helper_style;
+            target_style = style->pseudo_elem_first_letter_catcher_style;
         }
     }
 

@@ -6292,7 +6292,7 @@ void ldomNode::ensurePseudoElement( bool is_before ) {
 #endif
 }
 
-void ldomNode::ensurePseudoElementFirstLetter( bool is_helper ) {
+void ldomNode::ensureHasFirstLetterAttribute() {
 #if BUILD_LITE!=1
     if ( getNodeId() == el_DocFragment || getNodeId() == el_html ) {
         // These elements are top most and may get re-initNodeStyle() from
@@ -6300,13 +6300,10 @@ void ldomNode::ensurePseudoElementFirstLetter( bool is_helper ) {
         // (and using pseudo elements on them feels hackish): ignore them.
         return;
     }
-    
-    if ( is_helper ) {
-        // Set an attribute flag on this node to indicate it should have a ::first-letter pseudo element
-        // This flag will be used later in onBodyExit() to create the actual ::first-letter element
-        if ( !hasAttribute(attr_HasFirstLetter) ) {
-            setAttributeValue(LXML_NS_NONE, attr_HasFirstLetter, U"1");
-        }
+    // Set an attribute flag on this node to indicate it should have a ::first-letter pseudo element
+    // This flag will be used later in onBodyExit() to create the actual ::first-letter element
+    if ( !hasAttribute(attr_HasFirstLetter) ) {
+        setAttributeValue(LXML_NS_NONE, attr_HasFirstLetter, U"1");
     }
 
 #endif

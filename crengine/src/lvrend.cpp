@@ -11393,7 +11393,7 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // See if applying styles requires pseudo element before/after
     bool requires_pseudo_element_before = false;
     bool requires_pseudo_element_after = false;
-    bool requires_pseudo_element_first_letter_helper = false;
+    bool requires_has_first_letter_attribute = false;
     if ( pstyle->pseudo_elem_before_style ) {
         if ( pstyle->pseudo_elem_before_style->display != css_d_none
                 && pstyle->pseudo_elem_before_style->content.length() > 0
@@ -11416,13 +11416,13 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
         delete pstyle->pseudo_elem_after_style;
         pstyle->pseudo_elem_after_style = NULL;
     }
-    if ( pstyle->pseudo_elem_first_letter_helper_style ) {
-        if ( pstyle->pseudo_elem_first_letter_helper_style->display != css_d_none ) {
+    if ( pstyle->pseudo_elem_first_letter_catcher_style ) {
+        if ( pstyle->pseudo_elem_first_letter_catcher_style->display != css_d_none ) {
             // Not "display: none": this pseudo element can be generated
-            requires_pseudo_element_first_letter_helper = true;
+            requires_has_first_letter_attribute = true;
         }
-        delete pstyle->pseudo_elem_first_letter_helper_style;
-        pstyle->pseudo_elem_first_letter_helper_style = NULL;
+        delete pstyle->pseudo_elem_first_letter_catcher_style;
+        pstyle->pseudo_elem_first_letter_catcher_style = NULL;
     }
 
     if ( nodeElementId == el_pseudoElem && (enode->hasAttribute(attr_Before) || enode->hasAttribute(attr_After)) ) {
@@ -11454,8 +11454,8 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // are there as children, creating them if needed and possible
     if ( requires_pseudo_element_before )
         enode->ensurePseudoElement(true);
-    if ( requires_pseudo_element_first_letter_helper )
-        enode->ensurePseudoElementFirstLetter(true);
+    if ( requires_has_first_letter_attribute )
+        enode->ensureHasFirstLetterAttribute();
     if ( requires_pseudo_element_after )
         enode->ensurePseudoElement(false);
 
