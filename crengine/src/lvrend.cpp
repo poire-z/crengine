@@ -12279,6 +12279,32 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         if ( node->isText() ) {
             text = node->getText();
             parent = node->getParentNode();
+            // Check if this text node has a preceding FirstLetter pseudoElem
+            if ( node->getNodeIndex() > 0 ) {
+                ldomNode * parentNode = node->getParentNode();
+                ldomNode * firstChild = parentNode->getChildNode(0);
+                ldomNode * firstLetterNode = NULL;
+                // Check if firstChild IS the pseudoElem
+                if ( firstChild && firstChild->isElement() && 
+                     firstChild->getNodeId() == el_pseudoElem && 
+                     firstChild->hasAttribute(attr_FirstLetter) ) {
+                    firstLetterNode = firstChild;
+                }
+                else if ( firstChild && firstChild->isElement() ) {
+                    // Try to find it inside boxing elements
+                    firstLetterNode = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
+                    if ( firstLetterNode && (!firstLetterNode->isElement() || 
+                         firstLetterNode->getNodeId() != el_pseudoElem || 
+                         !firstLetterNode->hasAttribute(attr_FirstLetter)) ) {
+                        firstLetterNode = NULL;
+                    }
+                }
+                if ( firstLetterNode ) {
+                    // Skip the first N characters already handled by FirstLetter
+                    int textOffset = firstLetterNode->getAttributeValue(attr_FirstLetter).atoi();
+                    start = textOffset;
+                }
+            }
         }
         else if ( node->getNodeId() == el_pseudoElem && (node->hasAttribute(attr_Before) || node->hasAttribute(attr_After)) ) {
             text = get_applied_content_property(node);
@@ -12287,10 +12313,25 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
                 lang_cfg = TextLangMan::getTextLangCfg( node ); // Fetch it from node or its parents
             }
         }
+        else if ( node->getNodeId() == el_pseudoElem && node->hasAttribute(attr_FirstLetter) ) {
+            // FirstLetter pseudoElem: extract first N chars from following text node
+            int firstLetterEnd = node->getAttributeValue(attr_FirstLetter).atoi();
+            ldomNode * nextSibling = node->getUnboxedNextSibling(true);
+            if ( nextSibling && nextSibling->isText() ) {
+                text = nextSibling->getText();
+                len = firstLetterEnd; // Only measure the first N characters
+            }
+            parent = node; // this pseudoElem node carries the font and style of the text
+            if ( isStartNode ) {
+                lang_cfg = TextLangMan::getTextLangCfg( node ); // Fetch it from node or its parents
+            }
+        }
         else {
             return;
         }
-        len = text.length();
+        if ( len == 0 ) {
+            len = text.length() - start;
+        }
         if ( len == 0 )
             return;
         // letter-spacing
