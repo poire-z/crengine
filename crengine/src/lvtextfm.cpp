@@ -1259,7 +1259,7 @@ public:
                 #endif
 
                 int len = src->t.len;
-                lStr_ncpy( m_text+pos, src->t.text, len );
+                lStr_ncpy( m_text+pos, src->t.text + src->t.offset, len );
                 if ( i==0 || (src->flags & LTEXT_FLAG_NEWLINE) )
                     m_flags[pos] = LCHAR_MANDATORY_NEWLINE;
 
@@ -1811,7 +1811,7 @@ public:
     {
         src_text_fragment_t * srcline = &m_pbuffer->srctext[word->src_text_index];
         LVFont * srcfont= (LVFont *) srcline->t.font;
-        const lChar32 * str = srcline->t.text + word->t.start;
+        const lChar32 * str = srcline->t.text + srcline->t.offset + word->t.start;
         // Avoid malloc by using static buffers. Returns false if word too long.
         #define MAX_MEASURED_WORD_SIZE 127
         static lUInt16 widths[MAX_MEASURED_WORD_SIZE+1];
@@ -2662,7 +2662,7 @@ public:
                 &overBuf,
                 prev_word->x,
                 y_offset - prev_font->getBaseline() + prev_word->y,
-                prev_src->t.text + prev_word->t.start,
+                prev_src->t.text + prev_src->t.offset + prev_word->t.start,
                 prev_word->t.len,
                 '?',
                 NULL,
@@ -2684,7 +2684,7 @@ public:
                 &overBuf,
                 word->x,
                 y_offset - font->getBaseline() + word->y,
-                src->t.text + word->t.start,
+                src->t.text + src->t.offset + word->t.start,
                 word->t.len,
                 '?',
                 NULL,
@@ -3954,7 +3954,7 @@ public:
                         // do that if Harfbuzz is used, as it does that by itself, and
                         // would mirror back our mirrored chars!)
                         if ( m_kerning_mode != KERNING_MODE_HARFBUZZ ) {
-                            lChar32 * str = (lChar32*)(srcline->t.text + word->t.start);
+                            lChar32 * str = (lChar32*)(srcline->t.text + srcline->t.offset + word->t.start);
                             FriBidiChar mirror;
                             for (int i=0; i < word->t.len; i++) {
                                 if ( fribidi_get_mirror_char( (FriBidiChar)(str[i]), &mirror) )
@@ -6241,7 +6241,7 @@ void LFormattedText::Draw( LVDrawBuf * buf, int x, int y, ldomMarkedRangeList * 
                             flgHyphen = true;
                     }
                     font = (LVFont *) srcline->t.font;
-                    str = srcline->t.text + word->t.start;
+                    str = srcline->t.text + srcline->t.offset + word->t.start;
                     /*
                     lUInt32 srcFlags = srcline->flags;
                     if ( srcFlags & LTEXT_BACKGROUND_MARK_FLAGS ) {
