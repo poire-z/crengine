@@ -4402,10 +4402,16 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // If this text node is not the first child, check if the first child is/contains a FirstLetter pseudoElem
             if ( enode->getNodeIndex() > 0 ) {
                 ldomNode * firstChild = parent->getChildNode(0);
-                // The pseudoElem may be wrapped in boxing elements (e.g., floatBox, inlineBox, mathBox)
-                // Use getUnboxedFirstChild to traverse through nested boxing elements to find the pseudoElem
                 if ( firstChild && firstChild->isElement() ) {
-                    ldomNode * pseudoElem = firstChild->getUnboxedFirstChild(el_pseudoElem);
+                    ldomNode * pseudoElem = NULL;
+                    // Check if firstChild is the pseudoElem itself
+                    if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
+                        pseudoElem = firstChild;
+                    } else {
+                        // The pseudoElem may be wrapped in boxing elements (e.g., floatBox, inlineBox, mathBox)
+                        // Use getUnboxedFirstChild to traverse through nested boxing elements to find it
+                        pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
+                    }
                     if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
                         // This text node's first N characters were already emitted by the FirstLetter element
                         textOffset = pseudoElem->getAttributeValue(attr_FirstLetter).atoi();
