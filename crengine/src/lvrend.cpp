@@ -4399,8 +4399,9 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // Check if this text node has a preceding ::first-letter pseudo element
             int textOffset = 0;
             // Text nodes are usually standalone in their parent, but may have siblings
-            // If this text node is not the first child, check if the first child is/contains a FirstLetter pseudoElem
-            if ( enode->getNodeIndex() > 0 ) {
+            // Only check for the first text node (index == 1, with index 0 being the pseudoElem or its boxing wrapper)
+            // This ensures ::first-letter only affects the first text node, and text nodes after <br/> are not affected
+            if ( enode->getNodeIndex() == 1 ) {
                 ldomNode * firstChild = parent->getChildNode(0);
                 if ( firstChild && firstChild->isElement() ) {
                     ldomNode * pseudoElem = NULL;
@@ -12278,9 +12279,11 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         ldomNode * parent;
         if ( node->isText() ) {
             text = node->getText();
+            len = text.length();
             parent = node->getParentNode();
             // Check if this text node has a preceding FirstLetter pseudoElem
-            if ( node->getNodeIndex() > 0 ) {
+            // Only check for the first text node (index == 1, with index 0 being the pseudoElem or its boxing wrapper)
+            if ( node->getNodeIndex() == 1 ) {
                 ldomNode * parentNode = node->getParentNode();
                 ldomNode * firstChild = parentNode->getChildNode(0);
                 ldomNode * firstLetterNode = NULL;
@@ -12303,6 +12306,7 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
                     // Skip the first N characters already handled by FirstLetter
                     int textOffset = firstLetterNode->getAttributeValue(attr_FirstLetter).atoi();
                     start = textOffset;
+                    len = text.length() - start;
                 }
             }
         }
@@ -12316,7 +12320,7 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         else if ( node->getNodeId() == el_pseudoElem && node->hasAttribute(attr_FirstLetter) ) {
             // FirstLetter pseudoElem: extract first N chars from following text node
             int firstLetterEnd = node->getAttributeValue(attr_FirstLetter).atoi();
-            ldomNode * nextSibling = node->getUnboxedNextSibling(true);
+            ldomNode * nextSibling = node->getUnboxedNextSibling(false);
             if ( nextSibling && nextSibling->isText() ) {
                 text = nextSibling->getText();
                 len = firstLetterEnd; // Only measure the first N characters
@@ -12328,9 +12332,6 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         }
         else {
             return;
-        }
-        if ( len == 0 ) {
-            len = text.length() - start;
         }
         if ( len == 0 )
             return;

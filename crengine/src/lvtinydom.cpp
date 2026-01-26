@@ -19436,7 +19436,7 @@ bool ldomNode::isBoxingNode( bool orPseudoElem, lUInt16 exceptBoxingNodeId ) con
         if( id <= EL_BOXING_END && id >= EL_BOXING_START && id != exceptBoxingNodeId ) {
             return true;
         }
-        if ( orPseudoElem && id == el_pseudoElem ) {
+        if ( orPseudoElem && id == el_pseudoElem && exceptBoxingNodeId != el_pseudoElem ) {
             return true;
         }
     }
