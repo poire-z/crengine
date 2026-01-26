@@ -4402,25 +4402,11 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // If this text node is not the first child, check if the first child is/contains a FirstLetter pseudoElem
             if ( enode->getNodeIndex() > 0 ) {
                 ldomNode * firstChild = parent->getChildNode(0);
-                // The pseudoElem may be wrapped in boxing elements (e.g., floatBox)
-                // Search recursively for the FirstLetter pseudoElem
+                // The pseudoElem may be wrapped in boxing elements (e.g., floatBox, inlineBox, mathBox)
+                // Use getUnboxedFirstChild to traverse through nested boxing elements to find the pseudoElem
                 if ( firstChild && firstChild->isElement() ) {
-                    ldomNode * pseudoElem = NULL;
-                    if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
-                        pseudoElem = firstChild;
-                    } else {
-                        // Check if it's a boxing element containing the pseudoElem
-                        for ( int i = 0; i < firstChild->getChildCount(); i++ ) {
-                            ldomNode * child = firstChild->getChildNode(i);
-                            if ( child && child->isElement() && 
-                                 child->getNodeId() == el_pseudoElem && 
-                                 child->hasAttribute(attr_FirstLetter) ) {
-                                pseudoElem = child;
-                                break;
-                            }
-                        }
-                    }
-                    if ( pseudoElem ) {
+                    ldomNode * pseudoElem = firstChild->getUnboxedFirstChild(el_pseudoElem);
+                    if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
                         // This text node's first N characters were already emitted by the FirstLetter element
                         textOffset = pseudoElem->getAttributeValue(attr_FirstLetter).atoi();
                     }
