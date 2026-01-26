@@ -6984,7 +6984,6 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
     if ( node->getNodeId() == el_pseudoElem ) {
         if (    ( _pseudo_elem == csspe_before && node->hasAttribute(attr_Before) )
              || ( _pseudo_elem == csspe_after  && node->hasAttribute(attr_After)  )
-             || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetterHelper) )
              || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) ) ) {
             target_style = style;
         }

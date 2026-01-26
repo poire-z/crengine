@@ -5965,7 +5965,7 @@ static bool IS_FIRST_BODY = false;
 
 ldomElementWriter::ldomElementWriter(ldomDocument * document, lUInt16 nsid, lUInt16 id, ldomElementWriter * parent, bool insert_before_last_child)
     : _parent(parent), _document(document), _tocItem(NULL), _isBlock(true), _isSection(false),
-      _stylesheetIsSet(false), _bodyEnterCalled(false), _pseudoElementAfterChildIndex(-1), _pseudoElementFirstLetterHelperChildIndex(-1)
+      _stylesheetIsSet(false), _bodyEnterCalled(false), _pseudoElementAfterChildIndex(-1)
 {
     //logfile << "{c";
     _typeDef = _document->getElementTypePtr( id );
@@ -6184,15 +6184,6 @@ void ldomElementWriter::onBodyEnter()
                         child->initNodeStyle();
                         child->initNodeRendMethod();
                     }
-                    else if ( child->hasAttribute(attr_FirstLetterHelper) ) {
-                        // For the "FirstLetterHelper" pseudo element, we need to wait
-                        // for all real children to be added, to move it
-                        // as its right position (before ::after), to init its style
-                        // and its rendering method.
-                        // We'll do that in onBodyExit() when called for
-                        // this node.
-                        _pseudoElementFirstLetterHelperChildIndex = i;
-                    }
                     else if ( child->hasAttribute(attr_After) ) {
                         // For the "After" pseudo element, we need to wait
                         // for all real children to be added, to move it
@@ -6309,41 +6300,12 @@ void ldomNode::ensurePseudoElementFirstLetter( bool is_helper ) {
         // (and using pseudo elements on them feels hackish): ignore them.
         return;
     }
-    // This node should have that pseudoElement, but it might already be there,
-    // so check if there is already one, and if not, create it.
-    int insertChildIndex = -1;
-    int nb_children = getChildCount();
     
-    if ( is_helper ) { // ::first-letter-helper
-        // ::first-letter-helper should be inserted at the end (after ::after if present)
-        insertChildIndex = nb_children; // always insert at the end
-        
-        // First, check if ::first-letter-helper already exists
-        for ( int i = 0; i < nb_children; i++ ) {
-            ldomNode * child = getChildNode(i);
-            // pseudoElem might have been wrapped by a inlineBox, autoBoxing, floatBox...
-            ldomNode * unwrapped_child = child;
-            while ( unwrapped_child && unwrapped_child->isBoxingNode() && unwrapped_child->getChildCount()>0 )
-                unwrapped_child = unwrapped_child->getChildNode(0);
-            
-            if ( unwrapped_child && unwrapped_child->getNodeId() == el_pseudoElem ) {
-                if ( unwrapped_child->hasAttribute(attr_FirstLetterHelper) ) {
-                    // Already there, no need to create it
-                    insertChildIndex = -1;
-                    break;
-                }
-            }
-        }
-    }
-    
-    if ( insertChildIndex >= 0 ) {
-        if ( false && getDocument()->hasCacheFile() ) { // (20200626: this is no longer an issue)
-            getDocument()->setBoxingWishedButPreventedByCache();
-        }
-        else {
-            ldomNode * pseudo = insertChildElement( insertChildIndex, LXML_NS_NONE, el_pseudoElem );
-            pseudo->setAttributeValue(LXML_NS_NONE, attr_FirstLetterHelper, U"");
-            // Same comment as for ::before/::after applies here
+    if ( is_helper ) {
+        // Set an attribute flag on this node to indicate it should have a ::first-letter pseudo element
+        // This flag will be used later in onBodyExit() to create the actual ::first-letter element
+        if ( !hasAttribute(attr_HasFirstLetter) ) {
+            setAttributeValue(LXML_NS_NONE, attr_HasFirstLetter, U"1");
         }
     }
 
@@ -8548,19 +8510,9 @@ void ldomElementWriter::onBodyExit()
         child->initNodeStyle();
         child->initNodeRendMethod();
     }
-    if ( _pseudoElementFirstLetterHelperChildIndex >= 0 ) {
-        // Move ::first-letter-helper to the end (after ::after if present)
-        if ( _pseudoElementFirstLetterHelperChildIndex != _element->getChildCount()-1 ) {
-            // Not the last child: move it there
-            _element->moveItemsTo( _element, _pseudoElementFirstLetterHelperChildIndex, _pseudoElementFirstLetterHelperChildIndex);
-        }
-        // Now that all the real children of this node have had their
-        // style set, we can init the style of the "FirstLetterHelper" pseudo
-        // element, and its rend method as it has no children.
-        ldomNode * child = _element->getChildNode(_element->getChildCount()-1);
-        child->initNodeStyle();
-        child->initNodeRendMethod();
-        
+    
+    // Check if this element has the HasFirstLetter attribute flag
+    if ( _element->hasAttribute(attr_HasFirstLetter) ) {
         // Now, find the first visible non-empty text node and create the actual ::first-letter element
         // Use a depth-first search through the element's children (excluding pseudo elements)
         ldomNode * topNode = _element;

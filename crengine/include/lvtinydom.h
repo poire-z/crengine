@@ -2823,7 +2823,6 @@ class ldomElementWriter
     bool _stylesheetIsSet;
     bool _bodyEnterCalled;
     int _pseudoElementAfterChildIndex;
-    int _pseudoElementFirstLetterHelperChildIndex;
     lUInt32 _flags;
     lUInt32 getFlags();
     void updateTocItem();
