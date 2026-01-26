@@ -4178,6 +4178,23 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                         flags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
                     }
                 }
+                // Handle ::first-letter pseudo element
+                if ( nodeElementId == el_pseudoElem && enode->hasAttribute(attr_FirstLetter) ) {
+                    int firstLetterEnd = enode->getAttributeValueInt(attr_FirstLetter);
+                    // Find the next sibling text node
+                    ldomNode * nextSibling = enode->getUnboxedNextSibling();
+                    if ( nextSibling && nextSibling->isText() && firstLetterEnd > 0 ) {
+                        lString32 txt = nextSibling->getText();
+                        if ( txt.length() >= firstLetterEnd ) {
+                            // Extract first N characters for the first-letter
+                            lString32 firstLetterTxt = txt.substr(0, firstLetterEnd);
+                            int em = font->getSize();
+                            int letter_spacing = lengthToPx(enode, style->letter_spacing, em);
+                            txform->AddSourceLine( firstLetterTxt.c_str(), firstLetterTxt.length(), cl, bgcl, font.get(), lang_cfg, flags|LTEXT_FLAG_OWNTEXT, line_h, valign_dy, indent, enode, 0, letter_spacing);
+                            flags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
+                        }
+                    }
+                }
             }
 
             // is_link_start is given to inner elements (to flag the first
@@ -4379,6 +4396,15 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             #endif
 
             ldomNode * const parent = enode->getParentNode();
+            // Check if this text node has a preceding ::first-letter pseudo element
+            int textOffset = 0;
+            ldomNode * prevSibling = enode->getUnboxedPrevSibling();
+            if ( prevSibling && prevSibling->isElement() && 
+                 prevSibling->getNodeId() == el_pseudoElem && 
+                 prevSibling->hasAttribute(attr_FirstLetter) ) {
+                // This text node's first N characters were already emitted by the FirstLetter element
+                textOffset = prevSibling->getAttributeValueInt(attr_FirstLetter);
+            }
             lUInt32 tflags = LTEXT_FLAG_OWNTEXT;
             // if ( parent->getNodeId() == el_a ) // "123" in <a href=><sup>123</sup></a> would not be flagged
             if (is_link_start && *is_link_start) { // was propagated from some outer <A>
@@ -4456,7 +4482,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             }
             if ( txt.length()>0 ) {
                 txform->AddSourceLine( txt.c_str(), txt.length(), cl, bgcl, font.get(), lang_cfg, baseflags | tflags,
-                    line_h, valign_dy, indent, enode, 0, letter_spacing );
+                    line_h, valign_dy, indent, enode, textOffset, letter_spacing );
                 baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
                 // To show the lang tag for the lang used for this text node AFTER it:
                 // lString32 lang_tag_txt = U"[" + (lang_cfg ? lang_cfg->getLangTag() : lString32("??")) + U"]";
