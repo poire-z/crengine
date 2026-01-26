@@ -4180,7 +4180,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 }
                 // Handle ::first-letter pseudo element
                 if ( nodeElementId == el_pseudoElem && enode->hasAttribute(attr_FirstLetter) ) {
-                    int firstLetterEnd = enode->getAttributeValueInt(attr_FirstLetter);
+                    int firstLetterEnd = enode->getAttributeValue(attr_FirstLetter).atoi();
                     // Find the next sibling text node
                     ldomNode * nextSibling = enode->getUnboxedNextSibling();
                     if ( nextSibling && nextSibling->isText() && firstLetterEnd > 0 ) {
@@ -4403,7 +4403,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                  prevSibling->getNodeId() == el_pseudoElem && 
                  prevSibling->hasAttribute(attr_FirstLetter) ) {
                 // This text node's first N characters were already emitted by the FirstLetter element
-                textOffset = prevSibling->getAttributeValueInt(attr_FirstLetter);
+                textOffset = prevSibling->getAttributeValue(attr_FirstLetter).atoi();
             }
             lUInt32 tflags = LTEXT_FLAG_OWNTEXT;
             // if ( parent->getNodeId() == el_a ) // "123" in <a href=><sup>123</sup></a> would not be flagged
