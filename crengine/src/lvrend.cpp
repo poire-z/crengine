@@ -4398,12 +4398,33 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             ldomNode * const parent = enode->getParentNode();
             // Check if this text node has a preceding ::first-letter pseudo element
             int textOffset = 0;
-            ldomNode * prevSibling = enode->getUnboxedPrevSibling();
-            if ( prevSibling && prevSibling->isElement() && 
-                 prevSibling->getNodeId() == el_pseudoElem && 
-                 prevSibling->hasAttribute(attr_FirstLetter) ) {
-                // This text node's first N characters were already emitted by the FirstLetter element
-                textOffset = prevSibling->getAttributeValue(attr_FirstLetter).atoi();
+            // Text nodes are usually standalone in their parent, but may have siblings
+            // If this text node is not the first child, check if the first child is/contains a FirstLetter pseudoElem
+            if ( enode->getNodeIndex() > 0 ) {
+                ldomNode * firstChild = parent->getChildNode(0);
+                // The pseudoElem may be wrapped in boxing elements (e.g., floatBox)
+                // Search recursively for the FirstLetter pseudoElem
+                if ( firstChild && firstChild->isElement() ) {
+                    ldomNode * pseudoElem = NULL;
+                    if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
+                        pseudoElem = firstChild;
+                    } else {
+                        // Check if it's a boxing element containing the pseudoElem
+                        for ( int i = 0; i < firstChild->getChildCount(); i++ ) {
+                            ldomNode * child = firstChild->getChildNode(i);
+                            if ( child && child->isElement() && 
+                                 child->getNodeId() == el_pseudoElem && 
+                                 child->hasAttribute(attr_FirstLetter) ) {
+                                pseudoElem = child;
+                                break;
+                            }
+                        }
+                    }
+                    if ( pseudoElem ) {
+                        // This text node's first N characters were already emitted by the FirstLetter element
+                        textOffset = pseudoElem->getAttributeValue(attr_FirstLetter).atoi();
+                    }
+                }
             }
             lUInt32 tflags = LTEXT_FLAG_OWNTEXT;
             // if ( parent->getNodeId() == el_a ) // "123" in <a href=><sup>123</sup></a> would not be flagged
