@@ -3681,7 +3681,7 @@ public:
                                 // This is a bit hacky, but no other solution: just
                                 // replace that ignorable char with a space in the
                                 // src text
-                                *((lChar32 *) (m_srcs[wstart]->t.text + m_charindex[wstart])) = U' ';
+                                *((lChar32 *) (m_srcs[wstart]->t.text + m_srcs[wstart]->t.offset + m_charindex[wstart])) = U' ';
                             }
                             else if (m_srcs[wstart]->flags & LTEXT_SRC_IS_OBJECT && m_srcs[wstart]->o.objflags & LTEXT_OBJECT_IS_FLOAT) {
                                 // But not if what's on this line is a float (the code below don't expect floats)
