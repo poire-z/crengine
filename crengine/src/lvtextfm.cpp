@@ -1258,7 +1258,7 @@ public:
                 lbCtx.lbpLang = src->lang_cfg->getLBProps();
                 #endif
 
-                int len = src->t.len;
+                int len = src->t.len - src->t.offset;
                 lStr_ncpy( m_text+pos, src->t.text + src->t.offset, len );
                 if ( i==0 || (src->flags & LTEXT_FLAG_NEWLINE) )
                     m_flags[pos] = LCHAR_MANDATORY_NEWLINE;
