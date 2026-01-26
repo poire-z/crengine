@@ -924,7 +924,7 @@ public:
                 }
             }
             else {
-                pos += src->t.len;
+                pos += src->t.len - src->t.offset;
             }
         }
 
