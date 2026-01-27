@@ -6316,58 +6316,22 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
             // one that matches, since the FirstLetter element can be a grandchild.
             if ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) ) {
                 // This is a ::first-letter pseudo element
-                // Loop through ancestors to find the element that matches the FULL selector
+                // Find the ancestor with HasFirstLetter attribute - that's the one that matched initially
                 const ldomNode * ancestor = node->getUnboxedParent();
                 while ( ancestor ) {
-                    lUInt16 ancestorId = ancestor->getNodeId();
-                    // Skip pseudo elements
-                    if ( ancestorId == el_pseudoElem ) {
-                        ancestor = ancestor->getUnboxedParent();
-                        continue;
-                    }
-                    // Check if this ancestor matches the selector's element requirement
-                    if ( _id != 0 && ancestorId != _id ) {
-                        // Element name doesn't match, try next ancestor
-                        ancestor = ancestor->getUnboxedParent();
-                        continue;
-                    }
-                    // Element name matches (or no element requirement), now check additional rules
-                    if ( !_rules ) {
-                        // No additional rules to check, this ancestor matches
+                    if ( ancestor->hasAttribute(attr_HasFirstLetter) ) {
+                        // Found the element that originally matched and created the FirstLetter
                         node = ancestor;
-                        nodeId = ancestorId;
+                        nodeId = ancestor->getNodeId();
                         break;
                     }
-                    // Check additional rules (classes, attributes, pseudo-classes, etc.)
-                    const ldomNode * n = ancestor;
-                    const LVCssSelectorRule * rule = _rules.get();
-                    bool all_rules_match = true;
-                    do {
-                        if ( !rule->check(n, allow_cache) ) {
-                            all_rules_match = false;
-                            break;
-                        }
-                        // cssrt_ancessor or cssrt_predsibling rules will have checked next
-                        // rules on each parent or sibling. If it didn't return false, it
-                        // found one on which next rules match: no need to check them again
-                        if ( rule->isFullChecking() ) {
-                            break;
-                        }
-                        rule = rule->getNext();
-                    } while (rule != NULL);
-                    if ( all_rules_match ) {
-                        // This ancestor matches the full selector
-                        node = ancestor;
-                        nodeId = ancestorId;
-                        break;
-                    }
-                    // This ancestor doesn't match, try next one
                     ancestor = ancestor->getUnboxedParent();
                 }
                 if ( !ancestor ) {
                     // No matching ancestor found
                     return false;
                 }
+                // Now fall through to check the rules against this ancestor element
             }
             else {
                 // ::before/::after or FirstLetterHelper: check from the real parent
@@ -7105,10 +7069,28 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
     }
     if ( id == el_pseudoElem ) { // get the id chain from the parent element
         // Note that a "div:before {float:left}" will result in: <div><floatBox><pseudoElem>
-        // There is just one kind of boxing element that is explicitely
-        // added when parsing MathML (and can't be implicitely added) that
-        // could generate pseudo elements: <mathBox>. So, don't skip them
-        id = node->getUnboxedParent(el_mathBox)->getNodeId();
+        // For ::first-letter, find the ancestor with HasFirstLetter attribute
+        if ( node->hasAttribute(attr_FirstLetter) ) {
+            const ldomNode * ancestor = node->getUnboxedParent();
+            while ( ancestor ) {
+                if ( ancestor->hasAttribute(attr_HasFirstLetter) ) {
+                    id = ancestor->getNodeId();
+                    break;
+                }
+                ancestor = ancestor->getUnboxedParent();
+            }
+            if ( !ancestor ) {
+                // No matching ancestor found, shouldn't happen but use parent as fallback
+                id = node->getUnboxedParent()->getNodeId();
+            }
+        }
+        else {
+            // ::before/::after pseudo elements
+            // There is just one kind of boxing element that is explicitely
+            // added when parsing MathML (and can't be implicitely added) that
+            // could generate pseudo elements: <mathBox>. So, don't skip them
+            id = node->getUnboxedParent(el_mathBox)->getNodeId();
+        }
     }
     
     // _selectors[0] holds the ordered chain of selectors starting (from
