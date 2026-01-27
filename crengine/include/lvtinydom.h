@@ -912,10 +912,9 @@ public:
     // the wrapping element.
     ldomNode * boxWrapChildren( int startIndex, int endIndex, lUInt16 elementId );
 
-    // Ensure this node has a ::before/::after/::first-letter pseudo element as
+    // Ensure this node has a ::before/::after pseudo element as
     // child, creating it if needed and possible
     void ensurePseudoElement( bool is_before );
-    void ensureHasFirstLetterAttribute();
 
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
     bool applyNodeStylesheet();
