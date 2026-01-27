@@ -12323,7 +12323,6 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
                         len = text.length() - start;
                     }
                 }
-                }
             }
         }
         else if ( node->getNodeId() == el_pseudoElem && (node->hasAttribute(attr_Before) || node->hasAttribute(attr_After)) ) {
