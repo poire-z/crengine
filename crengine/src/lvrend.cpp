@@ -4408,9 +4408,10 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                     // Check if firstChild is the pseudoElem itself
                     if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
                         pseudoElem = firstChild;
-                    } else {
+                    } else if ( firstChild->isBoxingNode() ) {
                         // The pseudoElem may be wrapped in boxing elements (e.g., floatBox, inlineBox, mathBox)
-                        // Use getUnboxedFirstChild to traverse through nested boxing elements to find it
+                        // Only look inside boxing nodes - regular inline elements like <b>, <em>, <span>
+                        // have their own FirstLetter and should not be traversed
                         pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
                     }
                     if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
