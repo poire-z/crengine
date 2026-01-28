@@ -10181,7 +10181,7 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
                             if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
                                 // Call us again on that pseudoElem with the same offset as provided
                                 ldomXPointer xpFirstLetter(pseudoElem, offset);
-                                return xpFirstLetter.getRect(rect, adjusted, extended);
+                                return xpFirstLetter.getRect(rect, extended, adjusted);
                                 // This needs the trick in the next branch to be able to process the original text
                             }
                         }
