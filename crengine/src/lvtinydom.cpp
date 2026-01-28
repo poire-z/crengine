@@ -9863,12 +9863,14 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
             if ( find_first ) { // return xpointer to logical start of word
                 if ( node->isElement() ) // (see comment about <br/><br/> below)
                     return ldomXPointer(node, 0);
-                return ldomXPointer( node, src->t.offset + word->t.start );
+                // word->t.start is now absolute (includes offset)
+                return ldomXPointer( node, word->t.start );
             }
             else { // return xpointer to logical end of word
                 if ( node->isElement() )
                     return ldomXPointer(node, 0);
-                return ldomXPointer( node, src->t.offset + word->t.start + word->t.len );
+                // word->t.start is now absolute (includes offset)
+                return ldomXPointer( node, word->t.start + word->t.len );
             }
         }
 
@@ -9945,6 +9947,7 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
                 }
 
                 lUInt32 hints = WORD_FLAGS_TO_FNT_FLAGS(word->flags);
+                // word->t.start is now absolute (includes offset), so use it directly
                 font->measureText( str.c_str()+word->t.start, word->t.len, width, flg, word->width+50, '?',
                             src->lang_cfg, src->letter_spacing + word->added_letter_spacing, false, hints);
 
@@ -9960,12 +9963,14 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
                         if ( x < word->x + xx ) {
                             if ( node->isElement() )
                                 return ldomXPointer(node, 0);
-                            return ldomXPointer( node, src->t.offset + word->t.start + i );
+                            // word->t.start is now absolute (includes offset)
+                            return ldomXPointer( node, word->t.start + i );
                         }
                     }
                     if ( node->isElement() )
                         return ldomXPointer(node, 0);
-                    return ldomXPointer( node, src->t.offset + word->t.start );
+                    // word->t.start is now absolute (includes offset)
+                    return ldomXPointer( node, word->t.start );
                 }
                 else {
                     for ( int i=0; i<word->t.len; i++ ) {
@@ -9973,12 +9978,14 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
                         if ( x < word->x + xx ) {
                             if ( node->isElement() )
                                 return ldomXPointer(node, 0);
-                            return ldomXPointer( node, src->t.offset + word->t.start + i );
+                            // word->t.start is now absolute (includes offset)
+                            return ldomXPointer( node, word->t.start + i );
                         }
                     }
                     if ( node->isElement() )
                         return ldomXPointer( node, 0 );
-                    return ldomXPointer( node, src->t.offset + word->t.start + word->t.len );
+                    // word->t.start is now absolute (includes offset)
+                    return ldomXPointer( node, word->t.start + word->t.len );
                 }
             }
         }
