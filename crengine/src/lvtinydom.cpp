@@ -10178,15 +10178,15 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
                                 // Look inside if it is (probably) a floatBox
                                 pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
                             }
-                            if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem ) {
-                                // Recursively call getRect() on the pseudoElem with our offset
+                            if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
+                                // Call us again on that pseudoElem with the same offset as provided
                                 ldomXPointer xpFirstLetter(pseudoElem, offset);
-                                return xpFirstLetter.getRect(rect, extended, adjusted_y_baseline_flags);
+                                return xpFirstLetter.getRect(rect, adjusted, extended);
+                                // This needs the trick in the next branch to be able to process the original text
                             }
                         }
                     }
-                    // If we didn't find it, just break to use node's start rect
-                    break;
+                    // otherwise fallback to work on that node
                 }
                 else if ( node->getNodeId() == el_pseudoElem && node->hasAttribute(attr_FirstLetter) ) {
                     // We are called (from the previous branch) on a pseudoElem FirstLetter
