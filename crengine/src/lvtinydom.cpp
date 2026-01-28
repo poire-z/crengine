@@ -10155,6 +10155,39 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
             if ( isObject && src->o.objflags & LTEXT_OBJECT_IS_FLOAT ) // skip floats
                 continue;
             if ( src->object == node ) {
+                // Check and handle the case of ::first-letter
+                if ( src->t.offset > 0 && i > 0 && offset < src->t.offset) {
+                    // For now, we get non-0 src->t.offset only on a text node whose
+                    // start gets to be rendered as ::first-letter. If we happen
+                    // to get non-0 t.offset in other contexts, we'll have to use
+                    // a src->flag bit to let it known.
+                    // If offset < src->t.offset, we are in the first-letter part and
+                    // we won't find it here.
+                    // (It may be the src_text_fragment_t just before us, and we
+                    // could use: srcIndex = i-1 - but this does not handle all
+                    // cases, especially when the first-letter is a float.)
+                    // Try to find the pseudoElem that carries that first-letter
+                    if ( node->getNodeIndex() == 1 ) {
+                        ldomNode * firstChild = node->getParentNode()->getChildNode(0);
+                        if ( firstChild && firstChild->isElement() ) {
+                            ldomNode * pseudoElem = NULL;
+                            if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
+                                pseudoElem = firstChild; // firstChild is the pseudoElem itself
+                            }
+                            else if ( firstChild->isBoxingNode() ) {
+                                // Look inside if it is (probably) a floatBox
+                                pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
+                            }
+                            if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem ) {
+                                // Recursively call getRect() on the pseudoElem with our offset
+                                ldomXPointer xpFirstLetter(pseudoElem, offset);
+                                return xpFirstLetter.getRect(rect, extended, adjusted_y_baseline_flags);
+                            }
+                        }
+                    }
+                    // If we didn't find it, just return false (no rect)
+                    return false;
+                }
                 srcIndex = i;
                 srcLen = isObject ? 0 : src->t.len;
                 break;
