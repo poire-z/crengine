@@ -10185,8 +10185,18 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
                             }
                         }
                     }
-                    // If we didn't find it, just return false (no rect)
-                    return false;
+                    // If we didn't find it, just break to use node's start rect
+                    break;
+                }
+                else if ( node->getNodeId() == el_pseudoElem && node->hasAttribute(attr_FirstLetter) ) {
+                    // We are called (from the previous branch) on a pseudoElem FirstLetter
+                    // For it to get access to the text, we can just (for the code that follows)
+                    // have our "node" masquerade as the original node (we are called with
+                    // the original offset that will work on that text node).
+                    ldomNode * nextSibling = node->getUnboxedNextSibling();
+                    if ( nextSibling && nextSibling->isText() ) {
+                        node = nextSibling;
+                    }
                 }
                 srcIndex = i;
                 srcLen = isObject ? 0 : src->t.len;
