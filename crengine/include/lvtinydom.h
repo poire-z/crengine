@@ -1177,6 +1177,13 @@ public:
     ldomNode * getUnboxedLastChild( bool skip_text_nodes=false, lUInt16 exceptBoxingNodeId=0 ) const;
     ldomNode * getUnboxedPrevSibling( bool skip_text_nodes=false, lUInt16 exceptBoxingNodeId=0 ) const;
     ldomNode * getUnboxedNextSibling( bool skip_text_nodes=false, lUInt16 exceptBoxingNodeId=0 ) const;
+
+    /// Helper methods for ::first-letter pseudo element handling
+    /// Find FirstLetter pseudoElem from a text node at index 1, returns NULL if not found or display:none
+    /// If textOffset is provided, sets it to the FirstLetter character count
+    ldomNode * getFirstLetterPseudoElem(int * textOffset = NULL) const;
+    /// Find the text node following a FirstLetter pseudoElem, returns NULL if not found
+    ldomNode * getFirstLetterTextNode() const;
 };
 
 

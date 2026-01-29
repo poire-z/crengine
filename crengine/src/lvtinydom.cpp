@@ -10167,24 +10167,12 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
                     // could use: srcIndex = i-1 - but this does not handle all
                     // cases, especially when the first-letter is a float.)
                     // Try to find the pseudoElem that carries that first-letter
-                    if ( node->getNodeIndex() == 1 ) {
-                        ldomNode * firstChild = node->getParentNode()->getChildNode(0);
-                        if ( firstChild && firstChild->isElement() ) {
-                            ldomNode * pseudoElem = NULL;
-                            if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
-                                pseudoElem = firstChild; // firstChild is the pseudoElem itself
-                            }
-                            else if ( firstChild->isBoxingNode() ) {
-                                // Look inside if it is (probably) a floatBox
-                                pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
-                            }
-                            if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
-                                // Call us again on that pseudoElem with the same offset as provided
-                                ldomXPointer xpFirstLetter(pseudoElem, offset);
-                                return xpFirstLetter.getRect(rect, extended, adjusted);
-                                // This needs the trick in the next branch to be able to process the original text
-                            }
-                        }
+                    ldomNode * pseudoElem = node->getFirstLetterPseudoElem();
+                    if ( pseudoElem ) {
+                        // Call us again on that pseudoElem with the same offset as provided
+                        ldomXPointer xpFirstLetter(pseudoElem, offset);
+                        return xpFirstLetter.getRect(rect, extended, adjusted);
+                        // This needs the trick in the next branch to be able to process the original text
                     }
                     // otherwise fallback to work on that node
                 }
@@ -10193,9 +10181,9 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
                     // For it to get access to the text, we can just (for the code that follows)
                     // have our "node" masquerade as the original node (we are called with
                     // the original offset that will work on that text node).
-                    ldomNode * nextSibling = node->getUnboxedNextSibling();
-                    if ( nextSibling && nextSibling->isText() ) {
-                        node = nextSibling;
+                    ldomNode * textNode = node->getFirstLetterTextNode();
+                    if ( textNode ) {
+                        node = textNode;
                     }
                 }
                 srcIndex = i;
@@ -19629,6 +19617,77 @@ ldomNode * ldomNode::getUnboxedPrevSibling( bool skip_text_nodes, lUInt16 except
             break;
         }
     }
+    return NULL;
+}
+
+// Helper method: Find FirstLetter pseudoElem from a text node at index 1
+ldomNode * ldomNode::getFirstLetterPseudoElem(int * textOffset) const
+{
+    // This method should be called on a text node
+    if ( !isText() )
+        return NULL;
+    
+    // Only check for the first text node (index == 1, with index 0 being the pseudoElem or its boxing wrapper)
+    // This ensures ::first-letter only affects the first text node, and text nodes after <br/> are not affected
+    if ( getNodeIndex() != 1 )
+        return NULL;
+    
+    ldomNode * parent = getParentNode();
+    if ( !parent )
+        return NULL;
+    
+    ldomNode * firstChild = parent->getChildNode(0);
+    if ( !firstChild || !firstChild->isElement() )
+        return NULL;
+    
+    ldomNode * pseudoElem = NULL;
+    
+    // Check if firstChild is the pseudoElem itself
+    if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
+        pseudoElem = firstChild;
+    }
+    else if ( firstChild->isBoxingNode() ) {
+        // The pseudoElem may be wrapped in boxing elements (e.g., floatBox, inlineBox, mathBox)
+        // Only look inside boxing nodes - regular inline elements like <b>, <em>, <span>
+        // have their own FirstLetter and should not be traversed
+        pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
+        // Verify it's actually a FirstLetter pseudoElem
+        if ( pseudoElem && (pseudoElem->getNodeId() != el_pseudoElem || !pseudoElem->hasAttribute(attr_FirstLetter)) ) {
+            pseudoElem = NULL;
+        }
+    }
+    
+    // Check if we found a valid FirstLetter pseudoElem
+    if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
+        // Check for display:none - if set, return NULL as if FirstLetter doesn't exist
+        if ( pseudoElem->getStyle()->display == css_d_none ) {
+            return NULL;
+        }
+        
+        // If caller wants the textOffset, extract it from the attribute
+        if ( textOffset ) {
+            *textOffset = pseudoElem->getAttributeValue(attr_FirstLetter).atoi();
+        }
+        
+        return pseudoElem;
+    }
+    
+    return NULL;
+}
+
+// Helper method: Find the text node following a FirstLetter pseudoElem
+ldomNode * ldomNode::getFirstLetterTextNode() const
+{
+    // This method should be called on a FirstLetter pseudoElem
+    if ( !isElement() || getNodeId() != el_pseudoElem || !hasAttribute(attr_FirstLetter) )
+        return NULL;
+    
+    // Find the next sibling text node
+    ldomNode * nextSibling = getUnboxedNextSibling(false); // false = don't skip text nodes
+    if ( nextSibling && nextSibling->isText() ) {
+        return nextSibling;
+    }
+    
     return NULL;
 }
 

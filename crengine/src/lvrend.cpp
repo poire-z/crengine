@@ -4184,9 +4184,9 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                     if ( style->display != css_d_none ) {
                         int firstLetterEnd = enode->getAttributeValue(attr_FirstLetter).atoi();
                         // Find the next sibling text node
-                        ldomNode * nextSibling = enode->getUnboxedNextSibling();
-                        if ( nextSibling && nextSibling->isText() && firstLetterEnd > 0 ) {
-                            lString32 txt = nextSibling->getText();
+                        ldomNode * textNode = enode->getFirstLetterTextNode();
+                        if ( textNode && firstLetterEnd > 0 ) {
+                            lString32 txt = textNode->getText();
                             if ( txt.length() >= firstLetterEnd ) {
                                 // Extract first N characters for the first-letter
                                 lString32 firstLetterTxt = txt.substr(0, firstLetterEnd);
@@ -4401,31 +4401,8 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             ldomNode * const parent = enode->getParentNode();
             // Check if this text node has a preceding ::first-letter pseudo element
             int textOffset = 0;
-            // Text nodes are usually standalone in their parent, but may have siblings
-            // Only check for the first text node (index == 1, with index 0 being the pseudoElem or its boxing wrapper)
-            // This ensures ::first-letter only affects the first text node, and text nodes after <br/> are not affected
-            if ( enode->getNodeIndex() == 1 ) {
-                ldomNode * firstChild = parent->getChildNode(0);
-                if ( firstChild && firstChild->isElement() ) {
-                    ldomNode * pseudoElem = NULL;
-                    // Check if firstChild is the pseudoElem itself
-                    if ( firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
-                        pseudoElem = firstChild;
-                    } else if ( firstChild->isBoxingNode() ) {
-                        // The pseudoElem may be wrapped in boxing elements (e.g., floatBox, inlineBox, mathBox)
-                        // Only look inside boxing nodes - regular inline elements like <b>, <em>, <span>
-                        // have their own FirstLetter and should not be traversed
-                        pseudoElem = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
-                    }
-                    if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
-                        // This text node's first N characters were already emitted by the FirstLetter element
-                        // But don't apply offset if FirstLetter has display:none
-                        if ( pseudoElem->getStyle()->display != css_d_none ) {
-                            textOffset = pseudoElem->getAttributeValue(attr_FirstLetter).atoi();
-                        }
-                    }
-                }
-            }
+            ldomNode * pseudoElem = enode->getFirstLetterPseudoElem(&textOffset);
+            // getFirstLetterPseudoElem returns NULL if display:none, so textOffset remains 0
             lUInt32 tflags = LTEXT_FLAG_OWNTEXT;
             // if ( parent->getNodeId() == el_a ) // "123" in <a href=><sup>123</sup></a> would not be flagged
             if (is_link_start && *is_link_start) { // was propagated from some outer <A>
@@ -12294,35 +12271,13 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
             len = text.length();
             parent = node->getParentNode();
             // Check if this text node has a preceding FirstLetter pseudoElem
-            // Only check for the first text node (index == 1, with index 0 being the pseudoElem or its boxing wrapper)
-            if ( node->getNodeIndex() == 1 ) {
-                ldomNode * parentNode = node->getParentNode();
-                ldomNode * firstChild = parentNode->getChildNode(0);
-                ldomNode * firstLetterNode = NULL;
-                // Check if firstChild IS the pseudoElem
-                if ( firstChild && firstChild->isElement() && 
-                     firstChild->getNodeId() == el_pseudoElem && 
-                     firstChild->hasAttribute(attr_FirstLetter) ) {
-                    firstLetterNode = firstChild;
-                }
-                else if ( firstChild && firstChild->isElement() && firstChild->isBoxingNode() ) {
-                    // Only look inside boxing nodes - regular inline elements have their own FirstLetter
-                    firstLetterNode = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
-                    if ( firstLetterNode && (!firstLetterNode->isElement() || 
-                         firstLetterNode->getNodeId() != el_pseudoElem || 
-                         !firstLetterNode->hasAttribute(attr_FirstLetter)) ) {
-                        firstLetterNode = NULL;
-                    }
-                }
-                if ( firstLetterNode ) {
-                    // Skip the first N characters already handled by FirstLetter
-                    // But don't apply offset if FirstLetter has display:none
-                    if ( firstLetterNode->getStyle()->display != css_d_none ) {
-                        int textOffset = firstLetterNode->getAttributeValue(attr_FirstLetter).atoi();
-                        start = textOffset;
-                        len = text.length() - start;
-                    }
-                }
+            int textOffset = 0;
+            ldomNode * firstLetterNode = node->getFirstLetterPseudoElem(&textOffset);
+            if ( firstLetterNode ) {
+                // Skip the first N characters already handled by FirstLetter
+                // getFirstLetterPseudoElem already checked display:none
+                start = textOffset;
+                len = text.length() - start;
             }
         }
         else if ( node->getNodeId() == el_pseudoElem && (node->hasAttribute(attr_Before) || node->hasAttribute(attr_After)) ) {
@@ -12337,9 +12292,9 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
             // Skip if display:none
             if ( node->getStyle()->display != css_d_none ) {
                 int firstLetterEnd = node->getAttributeValue(attr_FirstLetter).atoi();
-                ldomNode * nextSibling = node->getUnboxedNextSibling(false);
-                if ( nextSibling && nextSibling->isText() ) {
-                    text = nextSibling->getText();
+                ldomNode * textNode = node->getFirstLetterTextNode();
+                if ( textNode ) {
+                    text = textNode->getText();
                     len = firstLetterEnd; // Only measure the first N characters
                 }
                 parent = node; // this pseudoElem node carries the font and style of the text
