@@ -12282,6 +12282,7 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         }
         else if ( node->getNodeId() == el_pseudoElem && (node->hasAttribute(attr_Before) || node->hasAttribute(attr_After)) ) {
             text = get_applied_content_property(node);
+            len = text.length();
             parent = node; // this pseudoElem node carries the font and style of the text
             if ( isStartNode ) {
                 lang_cfg = TextLangMan::getTextLangCfg( node ); // Fetch it from node or its parents
