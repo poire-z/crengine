@@ -6394,17 +6394,23 @@ void ldomNode::ensureFirstLetter() {
         ldomNode * textNodeParent = firstTextNode->getParentNode();
         int textNodeIndex = firstTextNode->getNodeIndex();
         
-        // Only create if text node is at index 1 and first child is not already a FirstLetter pseudoElem
-        if ( textNodeIndex == 1 ) {
-            ldomNode * firstChild = textNodeParent->getChildNode(0);
+        // At DOM loading time (or when no pseudoElem exists): textNodeIndex == 0
+        // After pseudoElem exists: textNodeIndex == 1
+        // Only create if textNodeIndex is 0 or 1 and pseudoElem doesn't already exist
+        if ( textNodeIndex == 0 || textNodeIndex == 1 ) {
             bool alreadyExists = false;
             
-            if ( firstChild && firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
-                alreadyExists = true;
-            } else if ( firstChild && firstChild->isBoxingNode() ) {
-                ldomNode * unboxed = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
-                if ( unboxed && unboxed->getNodeId() == el_pseudoElem && unboxed->hasAttribute(attr_FirstLetter) ) {
+            // If text node is at index 1, check if index 0 has the FirstLetter pseudoElem
+            if ( textNodeIndex == 1 ) {
+                ldomNode * firstChild = textNodeParent->getChildNode(0);
+                
+                if ( firstChild && firstChild->getNodeId() == el_pseudoElem && firstChild->hasAttribute(attr_FirstLetter) ) {
                     alreadyExists = true;
+                } else if ( firstChild && firstChild->isBoxingNode() ) {
+                    ldomNode * unboxed = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
+                    if ( unboxed && unboxed->getNodeId() == el_pseudoElem && unboxed->hasAttribute(attr_FirstLetter) ) {
+                        alreadyExists = true;
+                    }
                 }
             }
             
