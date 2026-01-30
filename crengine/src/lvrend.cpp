@@ -11479,11 +11479,7 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     if ( requires_pseudo_element_before )
         enode->ensurePseudoElement(true);
     if ( requires_has_first_letter_attribute ) {
-        // Set an attribute flag on this node to indicate it should have a ::first-letter pseudo element
-        // This flag will be used later in onBodyExit() to create the actual ::first-letter element
-        if ( !enode->hasAttribute(attr_HasFirstLetter) ) {
-            enode->setAttributeValue(LXML_NS_NONE, attr_HasFirstLetter, U"");
-        }
+        enode->ensureFirstLetter();
     }
     if ( requires_pseudo_element_after )
         enode->ensurePseudoElement(false);
