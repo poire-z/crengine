@@ -918,7 +918,9 @@ public:
     
     // Ensure this node has a ::first-letter pseudo element,
     // creating it if needed and possible
-    void ensureFirstLetter();
+    // initStyle: whether to call initNodeStyle() on newly created pseudoElem
+    //            (true during DOM building, false during stylesheet re-application)
+    void ensureFirstLetter(bool initStyle = false);
 
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
     bool applyNodeStylesheet();

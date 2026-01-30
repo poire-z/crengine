@@ -6292,12 +6292,16 @@ void ldomNode::ensurePseudoElement( bool is_before ) {
 #endif
 }
 
-void ldomNode::ensureFirstLetter() {
+void ldomNode::ensureFirstLetter(bool initStyle) {
 #if BUILD_LITE!=1
     // This method handles ::first-letter pseudo element creation in 3 contexts:
     // 1. Initial DOM building (setNodeStyle context): Sets attr_HasFirstLetter but doesn't create pseudoElem yet (no children)
     // 2. Initial DOM building (onBodyExit context): Finds first text node and creates the pseudoElem[FirstLetter]
     // 3. Stylesheet re-application: If element has children and needs ::first-letter, finds first text node and creates pseudoElem
+    // 
+    // initStyle parameter:
+    //   - true: call initNodeStyle() on newly created pseudoElem (during DOM building from onBodyExit)
+    //   - false: skip initNodeStyle() as it will be called during recursive style pass (during stylesheet re-application)
     
     // First, ensure the HasFirstLetter attribute is set
     if ( !hasAttribute(attr_HasFirstLetter) ) {
@@ -6423,9 +6427,12 @@ void ldomNode::ensureFirstLetter() {
                 indexStr << fmt::decimal(firstLetterEndIndex);
                 firstLetterElem->setAttributeValue(LXML_NS_NONE, attr_FirstLetter, indexStr.c_str());
                 
-                // Init style and rend method
-                firstLetterElem->initNodeStyle();
-                firstLetterElem->initNodeRendMethod();
+                // Init style and rend method only if requested (during DOM building from onBodyExit)
+                // During stylesheet re-application, skip this as it will be done by recursive style pass
+                if ( initStyle ) {
+                    firstLetterElem->initNodeStyle();
+                    firstLetterElem->initNodeRendMethod();
+                }
             }
         }
     }
@@ -8633,7 +8640,7 @@ void ldomElementWriter::onBodyExit()
     
     // Check if this element has the HasFirstLetter attribute flag
     if ( _element->hasAttribute(attr_HasFirstLetter) ) {
-        _element->ensureFirstLetter();
+        _element->ensureFirstLetter(true); // true = init style during DOM building
     }
 //    if ( _element->getStyle().isNull() ) {
 //        lString32 path;

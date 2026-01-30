@@ -11479,7 +11479,7 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     if ( requires_pseudo_element_before )
         enode->ensurePseudoElement(true);
     if ( requires_has_first_letter_attribute ) {
-        enode->ensureFirstLetter();
+        enode->ensureFirstLetter(false); // false = skip init style during stylesheet re-application
     }
     if ( requires_pseudo_element_after )
         enode->ensurePseudoElement(false);
