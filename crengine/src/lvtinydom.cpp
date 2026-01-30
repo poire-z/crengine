@@ -19656,38 +19656,31 @@ ldomNode * ldomNode::getFirstLetterPseudoElem(int * textOffset) const
             pseudoElem = NULL;
         }
     }
-    
-    // Check if we found a valid FirstLetter pseudoElem
-    if ( pseudoElem && pseudoElem->getNodeId() == el_pseudoElem && pseudoElem->hasAttribute(attr_FirstLetter) ) {
+    // If we have a pseudoElem at this point, it's already validated as FirstLetter
+    if ( pseudoElem ) {
         // Check for display:none - if set, return NULL as if FirstLetter doesn't exist
         if ( pseudoElem->getStyle()->display == css_d_none ) {
             return NULL;
         }
-        
         // If caller wants the textOffset, extract it from the attribute
         if ( textOffset ) {
             *textOffset = pseudoElem->getAttributeValue(attr_FirstLetter).atoi();
         }
-        
         return pseudoElem;
     }
-    
     return NULL;
 }
-
 // Helper method: Find the text node following a FirstLetter pseudoElem
 ldomNode * ldomNode::getFirstLetterTextNode() const
 {
     // This method should be called on a FirstLetter pseudoElem
     if ( !isElement() || getNodeId() != el_pseudoElem || !hasAttribute(attr_FirstLetter) )
         return NULL;
-    
     // Find the next sibling text node
     ldomNode * nextSibling = getUnboxedNextSibling(false); // false = don't skip text nodes
     if ( nextSibling && nextSibling->isText() ) {
         return nextSibling;
     }
-    
     return NULL;
 }
 
