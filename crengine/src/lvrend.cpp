@@ -11476,11 +11476,13 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
 
     // Now that this node is fully styled, ensure these pseudo elements
     // are there as children, creating them if needed and possible
-    if ( requires_pseudo_element_before )
-        enode->ensurePseudoElement(true);
+    // Note: ensureFirstLetter is called before ensurePseudoElement(true) to benefit
+    // from early return when getChildCount() == 0 during initial DOM building
     if ( requires_has_first_letter_attribute ) {
         enode->ensureFirstLetter(false); // false = skip init style during stylesheet re-application
     }
+    if ( requires_pseudo_element_before )
+        enode->ensurePseudoElement(true);
     if ( requires_pseudo_element_after )
         enode->ensurePseudoElement(false);
 
