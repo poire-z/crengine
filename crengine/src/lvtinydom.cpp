@@ -10215,7 +10215,7 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted) const
                 continue;
             if ( src->object == node ) {
                 // Check and handle the case of ::first-letter
-                if ( src->t.offset > 0 && i > 0 && offset < src->t.offset) {
+                if ( src->t.offset > 0 && offset < src->t.offset) {
                     // For now, we get non-0 src->t.offset only on a text node whose
                     // start gets to be rendered as ::first-letter. If we happen
                     // to get non-0 t.offset in other contexts, we'll have to use
