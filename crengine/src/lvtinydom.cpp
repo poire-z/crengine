@@ -6420,9 +6420,9 @@ void ldomNode::ensureFirstLetter(bool initStyle) {
             }
         }
         
-        // Insert FirstLetter immediately before the text node
-        if ( !alreadyExists && textNodeIndex >= 1 ) {
-            insertPosition = textNodeIndex - 1;
+        // Insert FirstLetter at the text node's position (text node will shift forward)
+        if ( !alreadyExists ) {
+            insertPosition = textNodeIndex;
         }
         
         if ( !alreadyExists ) {
