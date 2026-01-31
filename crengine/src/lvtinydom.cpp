@@ -6398,75 +6398,72 @@ void ldomNode::ensureFirstLetter(bool initStyle) {
         ldomNode * textNodeParent = firstTextNode->getParentNode();
         int textNodeIndex = firstTextNode->getNodeIndex();
         
-        // At DOM loading time (or when no pseudoElem exists): textNodeIndex == 0
-        // With only ::first-letter: textNodeIndex == 1
-        // With ::before and ::first-letter: textNodeIndex == 2
-        // Only create if textNodeIndex is 0, 1, or 2 and FirstLetter pseudoElem doesn't already exist
-        if ( textNodeIndex >= 0 && textNodeIndex <= 2 ) {
-            bool alreadyExists = false;
-            int insertPosition = textNodeIndex; // Default: insert right before text node
-            
-            // With consistent ordering, check index-1 (previous sibling) for existing FirstLetter
-            if ( textNodeIndex >= 1 ) {
-                ldomNode * prevSibling = textNodeParent->getChildNode(textNodeIndex - 1);
-                if ( prevSibling && prevSibling->isElement() ) {
-                    if ( prevSibling->getNodeId() == el_pseudoElem && prevSibling->hasAttribute(attr_FirstLetter) ) {
+        // Note: textNodeIndex can be any value >= 0, not just 0, 1, or 2
+        // (e.g., with <p><b> </b><em> </em>text, text node would be at index 2 or more)
+        
+        bool alreadyExists = false;
+        int insertPosition = 0; // Default: insert at index 0
+        
+        // Check previous sibling (index-1) for existing FirstLetter
+        if ( textNodeIndex >= 1 ) {
+            ldomNode * prevSibling = textNodeParent->getChildNode(textNodeIndex - 1);
+            if ( prevSibling && prevSibling->isElement() ) {
+                if ( prevSibling->getNodeId() == el_pseudoElem && prevSibling->hasAttribute(attr_FirstLetter) ) {
+                    alreadyExists = true;
+                }
+                else if ( prevSibling->isBoxingNode() ) {
+                    ldomNode * unboxed = prevSibling->getUnboxedFirstChild(true, el_pseudoElem);
+                    if ( unboxed && unboxed->getNodeId() == el_pseudoElem && unboxed->hasAttribute(attr_FirstLetter) ) {
                         alreadyExists = true;
                     }
-                    else if ( prevSibling->isBoxingNode() ) {
-                        ldomNode * unboxed = prevSibling->getUnboxedFirstChild(true, el_pseudoElem);
-                        if ( unboxed && unboxed->getNodeId() == el_pseudoElem && unboxed->hasAttribute(attr_FirstLetter) ) {
-                            alreadyExists = true;
-                        }
-                    }
                 }
             }
-            
-            // Determine insertion position: after ::before if it exists
-            // Check if there's a ::before pseudoElem at index 0
-            if ( !alreadyExists && textNodeIndex >= 1 ) {
-                ldomNode * firstChild = textNodeParent->getChildNode(0);
-                if ( firstChild && firstChild->isElement() ) {
-                    bool hasBeforePseudoElem = false;
-                    
-                    // Check if it's a ::before pseudoElem (has attr_Before, not attr_FirstLetter)
-                    if ( firstChild->getNodeId() == el_pseudoElem && 
-                         !firstChild->hasAttribute(attr_FirstLetter) && 
-                         firstChild->hasAttribute(attr_Before) ) {
+        }
+        
+        // Determine insertion position: check if ::before exists at index 0
+        // If it does, insert FirstLetter after it (at index 1)
+        if ( !alreadyExists && textNodeIndex >= 1 ) {
+            ldomNode * firstChild = textNodeParent->getChildNode(0);
+            if ( firstChild && firstChild->isElement() ) {
+                bool hasBeforePseudoElem = false;
+                
+                // Check if it's a ::before pseudoElem (has attr_Before, not attr_FirstLetter)
+                if ( firstChild->getNodeId() == el_pseudoElem && 
+                     !firstChild->hasAttribute(attr_FirstLetter) && 
+                     firstChild->hasAttribute(attr_Before) ) {
+                    hasBeforePseudoElem = true;
+                }
+                else if ( firstChild->isBoxingNode() ) {
+                    ldomNode * unboxed = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
+                    if ( unboxed && unboxed->getNodeId() == el_pseudoElem && 
+                         !unboxed->hasAttribute(attr_FirstLetter) && 
+                         unboxed->hasAttribute(attr_Before) ) {
                         hasBeforePseudoElem = true;
                     }
-                    else if ( firstChild->isBoxingNode() ) {
-                        ldomNode * unboxed = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
-                        if ( unboxed && unboxed->getNodeId() == el_pseudoElem && 
-                             !unboxed->hasAttribute(attr_FirstLetter) && 
-                             unboxed->hasAttribute(attr_Before) ) {
-                            hasBeforePseudoElem = true;
-                        }
-                    }
-                    
-                    // If ::before exists, insert FirstLetter after it (at index 1)
-                    // Otherwise, insert at index 0 (before text node)
-                    if ( hasBeforePseudoElem ) {
-                        insertPosition = 1; // Insert after ::before
-                    }
+                }
+                
+                // If ::before exists, insert FirstLetter after it (at index 1)
+                // Otherwise, insert at index 0
+                if ( hasBeforePseudoElem ) {
+                    insertPosition = 1; // Insert after ::before
                 }
             }
+        }
+        
+        if ( !alreadyExists ) {
+            // Create the ::first-letter pseudo element at the determined position
+            ldomNode * firstLetterElem = textNodeParent->insertChildElement( insertPosition, LXML_NS_NONE, el_pseudoElem );
             
-            if ( !alreadyExists ) {
-                // Create the ::first-letter pseudo element at the determined position
-                ldomNode * firstLetterElem = textNodeParent->insertChildElement( insertPosition, LXML_NS_NONE, el_pseudoElem );
-                
-                // Store the end index in the attribute value as a string
-                lString32 indexStr;
-                indexStr << fmt::decimal(firstLetterEndIndex);
-                firstLetterElem->setAttributeValue(LXML_NS_NONE, attr_FirstLetter, indexStr.c_str());
-                
-                // Init style and rend method only if requested (during DOM building from onBodyExit)
-                // During stylesheet re-application, skip this as it will be done by recursive style pass
-                if ( initStyle ) {
-                    firstLetterElem->initNodeStyle();
-                    firstLetterElem->initNodeRendMethod();
-                }
+            // Store the end index in the attribute value as a string
+            lString32 indexStr;
+            indexStr << fmt::decimal(firstLetterEndIndex);
+            firstLetterElem->setAttributeValue(LXML_NS_NONE, attr_FirstLetter, indexStr.c_str());
+            
+            // Init style and rend method only if requested (during DOM building from onBodyExit)
+            // During stylesheet re-application, skip this as it will be done by recursive style pass
+            if ( initStyle ) {
+                firstLetterElem->initNodeStyle();
+                firstLetterElem->initNodeRendMethod();
             }
         }
     }
@@ -19717,13 +19714,10 @@ ldomNode * ldomNode::getFirstLetterPseudoElem(int * textOffset) const
     
     int nodeIndex = getNodeIndex();
     
-    // Optimization: Only check for the first text node (at index 1 or 2)
-    // With consistent ordering (::before at 0, ::first-letter at 1, text at 2):
-    // - Text at index 1: ::first-letter at index 0 (no ::before)
-    // - Text at index 2: ::first-letter at index 1 (::before at index 0)
-    // Text nodes beyond index 2 never have ::first-letter (e.g., after <br/>)
-    if ( nodeIndex > 2 )
-        return NULL;
+    // Optimization: first text node can't be at index 0 (would need ::first-letter before it)
+    // With consistent ordering: ::before (optional), ::first-letter (optional), then text node
+    if ( nodeIndex < 1 )
+        return NULL; // Text at index 0 has no pseudo-element before it
     
     ldomNode * parent = getParentNode();
     if ( !parent )
@@ -19731,8 +19725,8 @@ ldomNode * ldomNode::getFirstLetterPseudoElem(int * textOffset) const
     
     // Check previous sibling (index-1) for FirstLetter pseudoElem
     // This is the only position where ::first-letter can be (with consistent ordering)
-    if ( nodeIndex < 1 )
-        return NULL; // Text at index 0 has no pseudo-element before it
+    // Note: Text node containing first letter may be at any index (1, 2, 3, ...)
+    // if there are empty inline elements before it (e.g., <b> </b><em> </em>text)
     
     ldomNode * prevSibling = parent->getChildNode(nodeIndex - 1);
     if ( !prevSibling || !prevSibling->isElement() )
