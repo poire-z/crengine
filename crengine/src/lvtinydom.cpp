@@ -6420,34 +6420,9 @@ void ldomNode::ensureFirstLetter(bool initStyle) {
             }
         }
         
-        // Determine insertion position: check if ::before exists at index 0
-        // If it does, insert FirstLetter after it (at index 1)
+        // Insert FirstLetter immediately before the text node
         if ( !alreadyExists && textNodeIndex >= 1 ) {
-            ldomNode * firstChild = textNodeParent->getChildNode(0);
-            if ( firstChild && firstChild->isElement() ) {
-                bool hasBeforePseudoElem = false;
-                
-                // Check if it's a ::before pseudoElem (has attr_Before, not attr_FirstLetter)
-                if ( firstChild->getNodeId() == el_pseudoElem && 
-                     !firstChild->hasAttribute(attr_FirstLetter) && 
-                     firstChild->hasAttribute(attr_Before) ) {
-                    hasBeforePseudoElem = true;
-                }
-                else if ( firstChild->isBoxingNode() ) {
-                    ldomNode * unboxed = firstChild->getUnboxedFirstChild(true, el_pseudoElem);
-                    if ( unboxed && unboxed->getNodeId() == el_pseudoElem && 
-                         !unboxed->hasAttribute(attr_FirstLetter) && 
-                         unboxed->hasAttribute(attr_Before) ) {
-                        hasBeforePseudoElem = true;
-                    }
-                }
-                
-                // If ::before exists, insert FirstLetter after it (at index 1)
-                // Otherwise, insert at index 0
-                if ( hasBeforePseudoElem ) {
-                    insertPosition = 1; // Insert after ::before
-                }
-            }
+            insertPosition = textNodeIndex - 1;
         }
         
         if ( !alreadyExists ) {
