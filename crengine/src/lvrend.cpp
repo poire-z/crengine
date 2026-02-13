@@ -2312,6 +2312,8 @@ public:
             MathML_checkAndTweakTableElement();
         #endif
         if ( is_ruby_table && rows.length() >= 2 ) {
+            // ruby-position should be handled here (via elem->getParentNode()->getStyle()->ruby_position)
+            // to choose row ordering for alternate/over/under.
             // Move 2nd row (first ruby annotation) to 1st position,
             // so base ruby text (initially 1st row) becomes 2nd
             rows.move(0, 1);
