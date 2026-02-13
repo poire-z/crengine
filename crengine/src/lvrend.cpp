@@ -4629,6 +4629,7 @@ void copystyle( css_style_ref_t source, css_style_ref_t dest )
     dest->word_break = source->word_break;
     dest->box_sizing = source->box_sizing;
     dest->caption_side = source->caption_side;
+    dest->ruby_position = source->ruby_position;
     dest->content = source->content ;
     dest->cr_hint.type = source->cr_hint.type ;
     dest->cr_hint.value = source->cr_hint.value ;
@@ -11064,6 +11065,7 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     UPDATE_STYLE_FIELD( line_break, css_lb_inherit );
     UPDATE_STYLE_FIELD( word_break, css_wb_inherit );
     UPDATE_STYLE_FIELD( caption_side, css_cs_inherit );
+    UPDATE_STYLE_FIELD( ruby_position, css_rp_inherit );
     UPDATE_STYLE_FIELD( border_collapse, css_border_c_inherit );
 
     // Firefox and Webkit/Chromium reset text-align: to 'start' for table if it originates from
