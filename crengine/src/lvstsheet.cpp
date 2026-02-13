@@ -4682,7 +4682,7 @@ bool LVCssDeclaration::parse( const char * &decl, bool higher_importance, lxmlDo
                 n = parse_name( decl, css_cs_names, -1 );
                 break;
             case cssd_ruby_position:
-                IF_g_SET_n_AND_break(true, css_rp_inherit, css_rp_alternate);
+                IF_g_SET_n_AND_break(true, css_rp_inherit, css_rp_over);
                 n = parse_name( decl, css_rp_names, -1 );
                 break;
             case cssd_content:
