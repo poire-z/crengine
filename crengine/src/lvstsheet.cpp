@@ -4682,7 +4682,7 @@ bool LVCssDeclaration::parse( const char * &decl, bool higher_importance, lxmlDo
                 n = parse_name( decl, css_cs_names, -1 );
                 break;
             case cssd_ruby_position:
-                IF_g_SET_n_AND_break(true, css_rp_inherit, css_rp_over);
+                IF_g_SET_n_AND_break(true, css_rp_inherit, css_rp_alternate);
                 n = parse_name( decl, css_rp_names, -1 );
                 break;
             case cssd_content:
@@ -5420,6 +5420,7 @@ void LVCssDeclaration::apply( css_style_rec_t * style, const ldomNode * node ) c
             break;
         case cssd_caption_side:
             style->Apply( (css_caption_side_t) *p++, &style->caption_side, imp_bit_caption_side, is_important );
+            style->flags |= STYLE_REC_FLAG_INHERITABLE_APPLIED;
             break;
         case cssd_ruby_position:
             style->Apply( (css_ruby_position_t) *p++, &style->ruby_position, imp_bit_ruby_position, is_important );

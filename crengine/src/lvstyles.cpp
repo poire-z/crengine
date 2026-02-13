@@ -44,7 +44,7 @@ lUInt32 calcHash(font_ref_t & f)
 lUInt32 calcHash(css_style_rec_t & rec)
 {
     if ( !rec.hash )
-        rec.hash = (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+        rec.hash = ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
          + (lUInt32)rec.important[0]) * 31
          + (lUInt32)rec.important[1]) * 31
          + (lUInt32)rec.important[2]) * 31
@@ -116,11 +116,11 @@ lUInt32 calcHash(css_style_rec_t & rec)
          + (lUInt32)rec.word_break) * 31
          + (lUInt32)rec.box_sizing) * 31
          + (lUInt32)rec.caption_side) * 31
+         + (lUInt32)rec.ruby_position) * 31
          + (lUInt32)rec.cr_hint.pack()) * 31
          + (lUInt32)rec.font_name.getHash()
          + (lUInt32)rec.background_image.getHash()
-         + (lUInt32)rec.content.getHash()
-         + (lUInt32)rec.ruby_position * 31);
+         + (lUInt32)rec.content.getHash());
     return rec.hash;
 }
 
