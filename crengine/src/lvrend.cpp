@@ -2315,7 +2315,7 @@ public:
             // The first row is the ruby base row and stays the base row.
             // Process annotation rows from index 1, resolving each row own ruby_position.
             // "alternate" resolves opposite of the last resolved over/under.
-            css_ruby_position_t last_resolved_position = css_rp_under; // so first "alternate" goes over
+            bool last_was_over = false; // so first "alternate" goes over
             for ( int i=1; i<rows.length(); i++ ) {
                 CCRTableRow * row = rows[i];
                 css_ruby_position_t ruby_position = css_rp_alternate;
@@ -2326,10 +2326,11 @@ public:
                     }
                 }
                 if ( ruby_position != css_rp_over && ruby_position != css_rp_under ) {
-                    ruby_position = (last_resolved_position == css_rp_over) ? css_rp_under : css_rp_over;
+                    ruby_position = last_was_over ? css_rp_under : css_rp_over;
                 }
-                last_resolved_position = ruby_position;
-                if ( ruby_position == css_rp_over ) {
+                bool is_over = ruby_position == css_rp_over;
+                last_was_over = is_over;
+                if ( is_over ) {
                     // Move each "over" row before all current rows (index 0).
                     // Later "over" rows end up farther from the base.
                     rows.move(0, i);
