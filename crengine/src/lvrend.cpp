@@ -2312,12 +2312,64 @@ public:
             MathML_checkAndTweakTableElement();
         #endif
         if ( is_ruby_table && rows.length() >= 2 ) {
-            // ruby-position should be handled here (via elem->getParentNode()->getStyle()->ruby_position)
-            // to choose row ordering for alternate/over/under.
-            // Move 2nd row (first ruby annotation) to 1st position,
-            // so base ruby text (initially 1st row) becomes 2nd
-            rows.move(0, 1);
-            rows_rendering_reordered = true;
+            // The first row is the ruby base row.
+            // Annotation rows start at index 1 and are reordered for rendering
+            // according to each row style->ruby_position.
+            CCRTableRow * ruby_base_row = rows[0];
+            LVPtrVector<CCRTableRow, false> over_rows;
+            LVPtrVector<CCRTableRow, false> under_rows;
+            // Alternate rows resolve opposite to the last resolved over/under,
+            // including explicit over/under from previous rows.
+            css_ruby_position_t last_resolved_position = css_rp_under; // so first "alternate" goes over
+            for ( int i=1; i<rows.length(); i++ ) {
+                CCRTableRow * row = rows[i];
+                css_ruby_position_t ruby_position = css_rp_alternate;
+                if ( row->elem ) {
+                    css_style_ref_t row_style = row->elem->getStyle();
+                    if ( !row_style.isNull() ) {
+                        ruby_position = row_style->ruby_position;
+                    }
+                }
+                if ( ruby_position != css_rp_over && ruby_position != css_rp_under ) {
+                    ruby_position = (last_resolved_position == css_rp_over) ? css_rp_under : css_rp_over;
+                }
+                last_resolved_position = ruby_position;
+                if ( ruby_position == css_rp_under ) {
+                    under_rows.add(row);
+                }
+                else {
+                    over_rows.add(row);
+                }
+            }
+            LVPtrVector<CCRTableRow, false> ordered_rows;
+            for ( int i=over_rows.length()-1; i>=0; i-- ) {
+                ordered_rows.add(over_rows[i]);
+            }
+            ordered_rows.add(ruby_base_row);
+            for ( int i=0; i<under_rows.length(); i++ ) {
+                ordered_rows.add(under_rows[i]);
+            }
+            bool ruby_rows_reordered = false;
+            for ( int i=0; i<rows.length(); i++ ) {
+                if ( rows[i] != ordered_rows[i] ) {
+                    ruby_rows_reordered = true;
+                    break;
+                }
+            }
+            if ( ruby_rows_reordered ) {
+                for ( int i=0; i<rows.length(); i++ ) {
+                    if ( rows[i] == ordered_rows[i] ) {
+                        continue;
+                    }
+                    for ( int j=i+1; j<rows.length(); j++ ) {
+                        if ( rows[j] == ordered_rows[i] ) {
+                            rows.move(i, j);
+                            break;
+                        }
+                    }
+                }
+                rows_rendering_reordered = true;
+            }
         }
         PlaceCells();
         if ( enhanced_rendering && rows_rendering_reordered ) {
