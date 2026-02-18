@@ -430,6 +430,7 @@ public:
     bool m_has_cjk; // true when some CJK met
     int  m_cjk_prev_line_added_space_div; // Used with CJK justified lines, to
     int  m_cjk_prev_line_added_space_mod; // apply same spacing on last line.
+    bool m_first_line_words_done; // true once the first-line words have been marked (::first-line)
 
 // These are not unicode codepoints: these values are put where we
 // store text indexes in the source text node.
@@ -471,6 +472,7 @@ public:
         m_has_cjk = false;
         m_cjk_prev_line_added_space_div = 0;
         m_cjk_prev_line_added_space_mod = 0;
+        m_first_line_words_done = false;
         m_specified_para_dir = REND_DIRECTION_UNSET;
         #if (USE_FRIBIDI==1)
             m_bidi_ctypes = NULL;
@@ -3986,6 +3988,12 @@ public:
                     if ( first ) { // first line of paragraph
                         if ( m_para_dir_is_rtl ? lastWord : firstWord )
                             word->flags |= LTEXT_WORD_BEGINS_PARAGRAPH;
+                        // Mark words on the first line for ::first-line pseudo-element styling.
+                        // Only the very first formatted line of the block gets this flag
+                        // (m_first_line_words_done becomes true after the first paragraph's
+                        // first line, preventing subsequent paragraphs from being marked).
+                        if ( m_pbuffer->has_first_line_style && !m_first_line_words_done )
+                            word->flags |= LTEXT_WORD_IS_FIRST_LINE;
                     }
                     if ( last ) { // last line of paragraph
                         if ( m_para_dir_is_rtl ? firstWord : lastWord )
@@ -5310,6 +5318,11 @@ public:
             // Best position to end this line found.
             bool hasInlineBoxes = firstInlineBoxPos >= 0 && firstInlineBoxPos < endp;
             addLine(pos, endp, x, para, pos==0, wrapPos>=m_length-1, preFormattedOnly, isLastPara, hasInlineBoxes);
+            // After the first line has been added (pos==0 means first line of paragraph),
+            // mark that we've processed the block's first formatted line so subsequent
+            // paragraphs (separated by <br> etc.) don't get ::first-line styling.
+            if ( pos == 0 )
+                m_first_line_words_done = true;
             pos = wrapPos + 1; // start of next line
 
             #if (USE_LIBUNIBREAK==1)
@@ -6242,6 +6255,9 @@ void LFormattedText::Draw( LVDrawBuf * buf, int x, int y, ldomMarkedRangeList * 
                             flgHyphen = true;
                     }
                     font = (LVFont *) srcline->t.font;
+                    // Apply ::first-line font override if this word is on the first line
+                    if ( (word->flags & LTEXT_WORD_IS_FIRST_LINE) && m_pbuffer->first_line_font )
+                        font = m_pbuffer->first_line_font;
                     str = srcline->t.text + word->t.start;
                     /*
                     lUInt32 srcFlags = srcline->flags;
@@ -6266,6 +6282,12 @@ void LFormattedText::Draw( LVDrawBuf * buf, int x, int y, ldomMarkedRangeList * 
                     lUInt32 oldBgColor = buf->GetBackgroundColor();
                     lUInt32 cl = srcline->color;
                     lUInt32 bgcl = srcline->bgcolor;
+                    // Apply ::first-line color override if this word is on the first line
+                    // and the ::first-line style explicitly sets a color (not LTEXT_COLOR_CURRENT)
+                    if ( (word->flags & LTEXT_WORD_IS_FIRST_LINE) && m_pbuffer->has_first_line_style
+                            && !LTEXT_COLOR_IS_RESERVED(m_pbuffer->first_line_color) ) {
+                        cl = m_pbuffer->first_line_color;
+                    }
                     if ( LTEXT_COLOR_IS_RESERVED(cl) ) {
                         if ( cl == LTEXT_COLOR_TRANSPARENT ) { // color: transparent
                             continue; // Don't draw this word

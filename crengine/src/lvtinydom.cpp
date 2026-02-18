@@ -6174,8 +6174,9 @@ void ldomElementWriter::onBodyEnter()
         if ( nb_children > 0 ) {
             // The only possibility for this element being built to have children
             // is if the above initNodeStyle() has applied to this node some
-            // matching selectors that had ::before or ::after or ::first-letter, which have then
-            // created one or two or three pseudoElem children. But let's be sure of that.
+            // matching selectors that had ::before or ::after or ::first-letter
+            // or ::first-line, which have then created one or more pseudoElem
+            // children. But let's be sure of that.
             for ( int i=0; i<nb_children; i++ ) {
                 ldomNode * child = _element->getChildNode(i);
                 if ( child->getNodeId() == el_pseudoElem ) {
@@ -6196,6 +6197,13 @@ void ldomElementWriter::onBodyEnter()
                         // We'll do that in onBodyExit() when called for
                         // this node.
                         _pseudoElementAfterChildIndex = i;
+                    }
+                    else if ( child->hasAttribute(attr_FirstLine) ) {
+                        // The "FirstLine" pseudo element is a style carrier
+                        // (no text content). Its style can be initialized here
+                        // as it doesn't depend on children content.
+                        child->initNodeStyle();
+                        child->initNodeRendMethod();
                     }
                 }
             }
@@ -6499,6 +6507,45 @@ ldomNode * ldomNode::getFirstLetterTextNode() const
         return nextSibling;
     }
     return NULL;
+}
+
+void ldomNode::ensureFirstLine(bool initStyle) {
+#if BUILD_LITE!=1
+    // This method handles ::first-line pseudo element creation.
+    // Unlike ::first-letter, the ::first-line pseudo element is a style carrier only:
+    // it holds no text content and is not rendered directly. Its computed style (font,
+    // color, etc.) is extracted in ldomNode::renderFinalBlock() and stored in the
+    // LFormattedText buffer, which then marks words on the first formatted line.
+
+    // Ensure the HasFirstLine attribute is set on this element
+    if ( !hasAttribute(attr_HasFirstLine) ) {
+        setAttributeValue(LXML_NS_NONE, attr_HasFirstLine, U"");
+    }
+
+    // Check if we already have a FirstLine pseudoElem child
+    for ( int i = 0; i < (int)getChildCount(); i++ ) {
+        ldomNode * child = getChildNode(i);
+        if ( child && child->isElement() && child->getNodeId() == el_pseudoElem
+                   && child->hasAttribute(attr_FirstLine) ) {
+            // Already exists; reinitialize its style if requested
+            if ( initStyle ) {
+                child->initNodeStyle();
+                child->initNodeRendMethod();
+            }
+            return;
+        }
+    }
+
+    // Create the FirstLine pseudo element as the first child of this element.
+    // It is a style carrier only; has no text content and will have display:none
+    // by default (set to inline by matching ::first-line rules via applyToPseudoElement).
+    ldomNode * firstLineElem = insertChildElement( 0, LXML_NS_NONE, el_pseudoElem );
+    firstLineElem->setAttributeValue(LXML_NS_NONE, attr_FirstLine, U"");
+    if ( initStyle ) {
+        firstLineElem->initNodeStyle();
+        firstLineElem->initNodeRendMethod();
+    }
+#endif
 }
 
 
@@ -8706,6 +8753,12 @@ void ldomElementWriter::onBodyExit()
     // and create a pseudoElem FirstLetter as the previous sibling of that text node
     if ( _element->hasAttribute(attr_HasFirstLetter) ) {
         _element->ensureFirstLetter(true); // true = init style during DOM building
+    }
+
+    // If this element has the HasFirstLine attribute flag, ensure the ::first-line
+    // style-carrier pseudo element is created as a child (it will be initNodeStyle()d here)
+    if ( _element->hasAttribute(attr_HasFirstLine) ) {
+        _element->ensureFirstLine(true); // true = init style during DOM building
     }
 
 //    if ( _element->getStyle().isNull() ) {
@@ -21170,6 +21223,34 @@ int ldomNode::renderFinalBlock(  LFormattedTextRef & frmtext, RenderRectAccessor
     // We need to store this LFormattedTextRef in the cache for it to
     // survive when leaving this function (some callers do use it).
     cache.set( this, f );
+
+    // If this block has a ::first-line pseudo-element style carrier, extract
+    // its font and color for use in marking first-line words during formatting.
+    if ( hasAttribute(attr_HasFirstLine) ) {
+        for ( int ci = 0; ci < (int)getChildCount(); ci++ ) {
+            ldomNode * child = getChildNode(ci);
+            if ( child && child->isElement() && child->getNodeId() == el_pseudoElem
+                       && child->hasAttribute(attr_FirstLine) ) {
+                // Found the ::first-line style carrier; extract its font and color.
+                // Compute the foreground color (returns LTEXT_COLOR_CURRENT if not
+                // explicitly set in ::first-line rules, i.e. only inherited).
+                css_style_ref_t flStyle = child->getStyle();
+                if ( !flStyle.isNull() && flStyle->display != css_d_none ) {
+                    LVFontRef flFont = child->getFont();
+                    lUInt32 flColor;
+                    if ( flStyle->color.type == css_val_color )
+                        flColor = LTEXT_COLOR_IS_RESERVED(flStyle->color.value) ?
+                                    LTEXT_COLOR_RESERVED_REPLACE : flStyle->color.value;
+                    else
+                        flColor = LTEXT_COLOR_CURRENT;
+                    if ( !flFont.isNull() ) {
+                        f->setFirstLineStyle(flFont.get(), flColor);
+                    }
+                }
+                break;
+            }
+        }
+    }
 
     // Gather some outer properties and context, so we can format (render)
     // the inner content in that context.

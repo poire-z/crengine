@@ -931,6 +931,10 @@ public:
     /// Find the text node following a FirstLetter pseudoElem, returns NULL if not found
     ldomNode * getFirstLetterTextNode() const;
 
+    // Ensure this node has a ::first-line pseudo element (style carrier), creating it if needed
+    // (initStyle: whether to call initNodeStyle() on newly created pseudoElem)
+    void ensureFirstLine(bool initStyle=false);
+
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
     bool applyNodeStylesheet();
 

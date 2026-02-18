@@ -320,6 +320,7 @@ enum LVCssSelectorPseudoElement
     csspe_before = 1,   // ::before
     csspe_after  = 2,   // ::after
     csspe_first_letter  = 3,   // ::first-letter
+    csspe_first_line    = 4,   // ::first-line
 };
 
 static const char * css_pseudo_elements[] =
@@ -327,6 +328,7 @@ static const char * css_pseudo_elements[] =
     "before",
     "after",
     "first-letter",
+    "first-line",
     NULL
 };
 
@@ -6339,7 +6341,7 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
 {
     lUInt16 nodeId = node->getNodeId();
     if ( nodeId == el_pseudoElem ) {
-        if ( !_pseudo_elem ) { // not a ::before/after/first-letter rule
+        if ( !_pseudo_elem ) { // not a ::before/after/first-letter/first-line rule
             // Our added pseudoElem element should not match any other rules
             // (if we added it as a child of a P element, it should not match P > *)
             return false;
@@ -6365,15 +6367,35 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
             }
             // Now fall through to check the rules against this ancestor element
         }
-        else { // ::before/::after
-            // Start checking the rules starting from the real parent
-            // (except if this selector target a boxing element: we should
-            // stop unboxing at that boxing element).
+        else if ( _pseudo_elem == csspe_first_line && node->hasAttribute(attr_FirstLine) ) {
+            // Find the ancestor with HasFirstLine attribute (the element matched by ::first-line)
+            const ldomNode * ancestor = node->getUnboxedParent();
+            while ( ancestor ) {
+                if ( ancestor->hasAttribute(attr_HasFirstLine) ) {
+                    node = ancestor;
+                    nodeId = ancestor->getNodeId();
+                    break;
+                }
+                ancestor = ancestor->getUnboxedParent();
+            }
+            if ( !ancestor ) {
+                // No matching ancestor found
+                return false;
+            }
+            // Now fall through to check the rules against this ancestor element
+        }
+        else if ( _pseudo_elem == csspe_before || _pseudo_elem == csspe_after ) {
+            // ::before/::after pseudo elements: start checking rules from the real parent
+            // (except if this selector targets a boxing element: stop unboxing there).
             if ( _id <= EL_BOXING_END && _id >= EL_BOXING_START )
                 node = node->getUnboxedParent(_id);
             else
                 node = node->getUnboxedParent();
             nodeId = node->getNodeId();
+        }
+        else {
+            // This pseudo-element node doesn't match this selector's pseudo-element type
+            return false;
         }
     }
     else if ( _id==0 && node->isBoxingNode() ) {
@@ -6507,8 +6529,8 @@ LVCssSelectorRule * parse_attr( const char * &str, lxmlDocBase * doc, bool usera
         // E:pseudo-class (eg: E:first-child)
         str++;
         if (*str==':') {
-            // pseudo element (double ::, eg: E::first-line) are not supported,
-            // except ::before/after which are handled in LVCssSelector::parse()
+            // pseudo element (double ::, eg: E::first-line): not supported here.
+            // Pseudo elements are handled in LVCssSelector::parse()
             str--;
             return NULL;
         }
@@ -6978,7 +7000,8 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
     if ( node->getNodeId() == el_pseudoElem ) {
         if (    ( _pseudo_elem == csspe_before && node->hasAttribute(attr_Before) )
              || ( _pseudo_elem == csspe_after  && node->hasAttribute(attr_After)  )
-             || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) ) ) {
+             || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) )
+             || ( _pseudo_elem == csspe_first_line    && node->hasAttribute(attr_FirstLine) ) ) {
             target_style = style;
         }
     }
@@ -7006,6 +7029,12 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
                 style->pseudo_elem_first_letter_catcher_style = new css_style_rec_t;
             }
             target_style = style->pseudo_elem_first_letter_catcher_style;
+        }
+        else if ( _pseudo_elem == csspe_first_line ) {
+            if ( !style->pseudo_elem_first_line_style ) {
+                style->pseudo_elem_first_line_style = new css_style_rec_t;
+            }
+            target_style = style->pseudo_elem_first_line_style;
         }
     }
 
@@ -7105,6 +7134,20 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
             const ldomNode * ancestor = node->getUnboxedParent();
             while ( ancestor ) {
                 if ( ancestor->hasAttribute(attr_HasFirstLetter) ) {
+                    id = ancestor->getNodeId();
+                    break;
+                }
+                ancestor = ancestor->getUnboxedParent();
+            }
+            if ( !ancestor ) { // shouldn't happen
+                return;
+            }
+        }
+        else if ( node->hasAttribute(attr_FirstLine) ) {
+            // For ::first-line, find the ancestor with HasFirstLine attribute
+            const ldomNode * ancestor = node->getUnboxedParent();
+            while ( ancestor ) {
+                if ( ancestor->hasAttribute(attr_HasFirstLine) ) {
                     id = ancestor->getNodeId();
                     break;
                 }

@@ -447,6 +447,8 @@ XS_ATTR( Before ) // for pseudoElem internal element
 XS_ATTR( After )  // for pseudoElem internal element
 XS_ATTR( FirstLetter )    // for pseudoElem internal element (the actual first-letter holder)
 XS_ATTR( HasFirstLetter ) // on elements matched by ::first-letter that will get an inner pseudoElem FirstLetter
+XS_ATTR( FirstLine )      // for pseudoElem internal element (the ::first-line style carrier)
+XS_ATTR( HasFirstLine )   // on elements matched by ::first-line that will get an inner pseudoElem FirstLine
 XS_ATTR( ParserHint )   // HTML parser hints (used for Lib.ru support)
 XS_ATTR( NonLinear )    // for non-linear items in EPUB
 XS_ATTR( Source )       // set on DocFragment to the path of the file in the EPUB, for info
