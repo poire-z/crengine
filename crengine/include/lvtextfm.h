@@ -204,7 +204,6 @@ typedef struct
 #define LTEXT_WORD_VALIGN_BOTTOM             0x2000 /// word is to be vertical-align: bottom
 #define LTEXT_WORD_STRUT_CONFINED            0x4000 /// word is to be fully contained into strut bounds
                                                     /// (used only when one of the 2 previous is set)
-#define LTEXT_WORD__AVAILABLE_BIT_16__       0x8000  // PREVIOUSLY AVAILABLE - now used for first-line
 #define LTEXT_WORD_IS_FIRST_LINE             0x8000  /// word is on the first formatted line (for ::first-line pseudo-element)
 
 //#define LTEXT_BACKGROUND_MARK_FLAGS 0xFFFF0000l
