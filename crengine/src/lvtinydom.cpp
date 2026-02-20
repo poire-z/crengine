@@ -6584,6 +6584,14 @@ void ldomNode::ensureFirstLine(bool initStyle) {
     // The clones naturally inherit from the ::first-line style, solving
     // the measurement/layout issue.
 
+    // Only create ::first-line for real document elements, not boxing elements
+    // or pseudo elements themselves
+    lUInt16 nodeId = getNodeId();
+    if ( nodeId == el_pseudoElem || nodeId == el_inlineBox || nodeId == el_floatBox ||
+         nodeId == el_tabularBox || nodeId == el_cloneNode ) {
+        return; // Skip ::first-line creation for non-original elements
+    }
+
     // Ensure the HasFirstLine attribute is set on this element
     if ( !hasAttribute(attr_HasFirstLine) ) {
         setAttributeValue(LXML_NS_NONE, attr_HasFirstLine, U"");
