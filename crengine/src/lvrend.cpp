@@ -3273,46 +3273,12 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
 {
     bool legacy_rendering = !BLOCK_RENDERING_N(enode, ENHANCED);
     
-    if ( enode->isElement() ) {
+    // Early check for cloneNode text elements to route them to text handling
+    bool isCloneText = enode->isElement() && enode->getNodeId() == el_cloneNode && enode->hasAttribute(attr_T);
+    
+    if ( enode->isElement() && !isCloneText ) {
         lUInt16 nodeElementId = enode->getNodeId();
         ldomNode * originalForAttrs = NULL;
-        
-        // Special handling for cloneNode elements that represent text nodes
-        if ( nodeElementId == el_cloneNode && enode->hasAttribute(attr_T) ) {
-            // This cloneNode represents a text node from the original DOM
-            ldomNode * originalNode = enode->getCloneNodeSource();
-            if ( originalNode && originalNode->isText() ) {
-                lString32 txt = originalNode->getText();
-                if ( !txt.empty() ) {
-                    // Get style and font from the cloneNode parent (which inherits from ::first-line)
-                    ldomNode * parent = enode->getParentNode();
-                    LVFontRef const font = parent->getFont();
-                    css_style_ref_t style = parent->getStyle();
-                    
-                    lUInt32 cl = getForegroundColor(style);
-                    lUInt32 bgcl = parent->getRendMethod() == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
-                    
-                    // Apply text transform if needed
-                    switch (style->text_transform) {
-                        case css_tt_uppercase: txt.uppercase(); break;
-                        case css_tt_lowercase: txt.lowercase(); break;
-                        case css_tt_capitalize: txt.capitalize(); break;
-                        case css_tt_full_width: break;
-                        case css_tt_none:
-                        case css_tt_inherit: break;
-                    }
-                    
-                    int em = font->getSize();
-                    int letter_spacing = lengthToPx(parent, style->letter_spacing, em);
-                    lUInt32 tflags = LTEXT_FLAG_OWNTEXT;
-                    
-                    txform->AddSourceLine( txt.c_str(), txt.length(), cl, bgcl, font.get(), lang_cfg, 
-                                         baseflags | tflags, line_h, valign_dy, indent, originalNode, 0, letter_spacing );
-                    baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH;
-                }
-            }
-            return;
-        }
         
         // For cloneNode elements that represent element nodes (not text):
         // Process them mostly normally, but use the original node for attribute checks
@@ -4483,9 +4449,19 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                             line_h, valign_dy, 0, enode);
         }
     }
-    else if ( enode->isText() ) {
-        // text nodes
-        lString32 txt = enode->getText();
+    else if ( enode->isText() || isCloneText ) {
+        // text nodes (or cloneNode elements representing text nodes)
+        ldomNode * textSourceNode = enode;
+        
+        // For cloneNode text elements, get the original text node
+        if ( isCloneText ) {
+            textSourceNode = enode->getCloneNodeSource();
+            if ( !textSourceNode || !textSourceNode->isText() ) {
+                return; // Invalid cloneNode
+            }
+        }
+        
+        lString32 txt = textSourceNode->getText();
         if ( !txt.empty() ) {
             #ifdef DEBUG_DUMP_ENABLED
                 for (int i=0; i<enode->getNodeLevel(); i++)
@@ -4574,7 +4550,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // If this text node has a preceding ::first-letter pseudo element,
             // we should skip adding the leading text rendered by that pseudoElem
             int textOffset = 0;
-            enode->getFirstLetterPseudoElem(&textOffset);
+            textSourceNode->getFirstLetterPseudoElem(&textOffset);
             // Just below, if it happens that txt.length()=textOffset (single letter
             // text node that got to be a first-letter, with no remaining text),
             // we will let an empty text source be added. An empty text node seems
@@ -4583,7 +4559,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
 
             if ( txt.length() > 0 ) {
                 txform->AddSourceLine( txt.c_str(), txt.length(), cl, bgcl, font.get(), lang_cfg, baseflags | tflags,
-                    line_h, valign_dy, indent, enode, textOffset, letter_spacing );
+                    line_h, valign_dy, indent, textSourceNode, textOffset, letter_spacing );
                 baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
                 // To show the lang tag for the lang used for this text node AFTER it:
                 // lString32 lang_tag_txt = U"[" + (lang_cfg ? lang_cfg->getLangTag() : lString32("??")) + U"]";
