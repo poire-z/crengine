@@ -6198,13 +6198,7 @@ void ldomElementWriter::onBodyEnter()
                         // this node.
                         _pseudoElementAfterChildIndex = i;
                     }
-                    else if ( child->hasAttribute(attr_FirstLine) ) {
-                        // The "FirstLine" pseudo element is a style carrier
-                        // (no text content). Its style can be initialized here
-                        // as it doesn't depend on children content.
-                        child->initNodeStyle();
-                        child->initNodeRendMethod();
-                    }
+
                 }
             }
         }
@@ -6584,13 +6578,7 @@ void ldomNode::ensureFirstLine(bool initStyle) {
     // The clones naturally inherit from the ::first-line style, solving
     // the measurement/layout issue.
 
-    // Only create ::first-line for real document elements, not boxing elements
-    // or pseudo elements themselves
-    lUInt16 nodeId = getNodeId();
-    if ( nodeId == el_pseudoElem || nodeId == el_inlineBox || nodeId == el_floatBox ||
-         nodeId == el_tabularBox || nodeId == el_cloneNode ) {
-        return; // Skip ::first-line creation for non-original elements
-    }
+
 
     // Ensure the HasFirstLine attribute is set on this element
     if ( !hasAttribute(attr_HasFirstLine) ) {
@@ -6622,15 +6610,10 @@ void ldomNode::ensureFirstLine(bool initStyle) {
     // Only clone children if the pseudoElem doesn't already have cloneNodes
     // This keeps the DOM stable across multiple ensureFirstLine() calls
     if ( firstLineElem->getChildCount() == 0 ) {
-        // Clone all children of this element (except the pseudoElem itself) into firstLineElem
-        for ( int i = 0; i < (int)getChildCount(); i++ ) {
+        // Clone all children of this element into firstLineElem
+        // Skip the first child (i=1) since it's the firstLineElem itself (possibly boxed)
+        for ( int i = 1; i < (int)getChildCount(); i++ ) {
             ldomNode * child = getChildNode(i);
-            if ( child == firstLineElem ) {
-                continue; // Skip the pseudoElem itself
-            }
-            if ( child->getNodeId() == el_pseudoElem ) {
-                continue; // Skip other pseudo elements (::before, ::after, etc.)
-            }
             
             // Clone this child into the firstLineElem
             ldomNode * clonedChild = cloneNodeRecursively(child, firstLineElem);

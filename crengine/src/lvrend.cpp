@@ -11598,20 +11598,19 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
 
     // Now that this node is fully styled, ensure these pseudo elements
     // are there as children, creating them if needed and possible.
-    // Note: we call ensureFirstLine and ensureFirstLetter before ensurePseudoElement(true)
-    // to keep things simpler in these methods and in other first-letter handling bits:
-    // if we have both a ::first-letter and a ::before, the ::before will be inserted
-    // before the ::first-letter. This is not per CSS-specs (a ::first-letter should pick
-    // the first-letter from the ::before, so logically it should come first) but
-    // supporting that would make everything more complicated.
+    // Note: we call ensurePseudoElement(true) for ::before first, then ensureFirstLine
+    // and ensureFirstLetter, and finally ensurePseudoElement(false) for ::after.
+    // This ensures ::before/::after/::first-letter are cloned into ::first-line's
+    // pseudo element, and ::before appears before ::first-line in the DOM (so it
+    // doesn't get pushed to the next line by ::first-line's 100% width).
+    if ( requires_pseudo_element_before )
+        enode->ensurePseudoElement(true);
     if ( requires_has_first_line_attribute ) {
         enode->ensureFirstLine(false); // false = skip init style during stylesheet re-application
     }
     if ( requires_has_first_letter_attribute ) {
         enode->ensureFirstLetter(false); // false = skip init style during stylesheet re-application
     }
-    if ( requires_pseudo_element_before )
-        enode->ensurePseudoElement(true);
     if ( requires_pseudo_element_after )
         enode->ensurePseudoElement(false);
 
