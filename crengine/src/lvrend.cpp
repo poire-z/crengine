@@ -10924,6 +10924,15 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
         pstyle->display = css_d_none;
     }
 
+    // For ::first-line pseudoElem, force display: inline-block and width: 100%
+    // This makes it a block-level inline box that takes full width, allowing
+    // it to be formatted independently and stopped after the first line.
+    if (nodeElementId == el_pseudoElem && enode->hasAttribute(attr_FirstLine)) {
+        pstyle->display = css_d_inline_block;
+        pstyle->width.type = css_val_percent;
+        pstyle->width.value = 100 * 256; // 100% in fixed point (256 = 1.0)
+    }
+
     if ( BLOCK_RENDERING(rend_flags, PREPARE_FLOATBOXES) ) {
         // https://developer.mozilla.org/en-US/docs/Web/CSS/float
         //  As float implies the use of the block layout, it modifies the computed value
