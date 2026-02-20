@@ -455,7 +455,6 @@ XS_ATTR( FirstLetter )    // for pseudoElem internal element (the actual first-l
 XS_ATTR( HasFirstLetter ) // on elements matched by ::first-letter that will get an inner pseudoElem FirstLetter
 XS_ATTR( FirstLine )      // for pseudoElem internal element (the ::first-line style carrier)
 XS_ATTR( HasFirstLine )   // on elements matched by ::first-line that will get an inner pseudoElem FirstLine
-XS_ATTR( CloneType )      // for cloneNode: stores the element name ID of the cloned element
 XS_ATTR( CloneNodeId )    // for cloneNode: stores the data index of the original node
 XS_ATTR( ParserHint )   // HTML parser hints (used for Lib.ru support)
 XS_ATTR( NonLinear )    // for non-linear items in EPUB

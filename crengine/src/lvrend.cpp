@@ -3272,6 +3272,18 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                        lString32 running_bidi_ctrlchars )
 {
     bool legacy_rendering = !BLOCK_RENDERING_N(enode, ENHANCED);
+    
+    // Handle cloneNode elements: delegate to the original node
+    if ( enode->isElement() && enode->getNodeId() == el_cloneNode ) {
+        ldomNode * originalNode = enode->getCloneNodeSource();
+        if ( originalNode ) {
+            // Process the original node as if we encountered it directly
+            renderFinalBlock(originalNode, txform, fmt, baseflags, indent, line_h, 
+                           lang_cfg, valign_dy, is_link_start, running_bidi_ctrlchars);
+        }
+        return;
+    }
+    
     if ( enode->isElement() ) {
         lvdom_element_render_method rm = enode->getRendMethod();
         if ( rm == erm_invisible )

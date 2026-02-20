@@ -934,6 +934,10 @@ public:
     // Ensure this node has a ::first-line pseudo element (style carrier), creating it if needed
     // (initStyle: whether to call initNodeStyle() on newly created pseudoElem)
     void ensureFirstLine(bool initStyle=false);
+    
+    /// Get the original node from a cloneNode element (for ::first-line)
+    /// Returns NULL if this is not a cloneNode or if the original node cannot be found
+    ldomNode * getCloneNodeSource() const;
 
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
     bool applyNodeStylesheet();

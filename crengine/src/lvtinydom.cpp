@@ -6510,6 +6510,8 @@ ldomNode * ldomNode::getFirstLetterTextNode() const
 }
 
 // Helper function to recursively clone a node and its children for ::first-line
+// Clones only store a reference (CloneNodeId) to the original node.
+// All queries (element name, attributes, text content) delegate to the original.
 static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
 #if BUILD_LITE!=1
     if ( !source || !parent )
@@ -6517,50 +6519,19 @@ static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
     
     ldomNode * clone = NULL;
     
+    // Create a cloneNode element for both text and element nodes
+    clone = parent->insertChildElement( parent->getChildCount(), LXML_NS_NONE, el_cloneNode );
+    
+    // Store reference to the original node
+    lString32 nodeIdStr;
+    nodeIdStr << fmt::decimal(source->getDataIndex());
+    clone->setAttributeValue(LXML_NS_NONE, attr_CloneNodeId, nodeIdStr.c_str());
+    
     if ( source->isText() ) {
-        // Clone text node: create a cloneNode element with CloneType="TEXT"
-        clone = parent->insertChildElement( parent->getChildCount(), LXML_NS_NONE, el_cloneNode );
-        clone->setAttributeValue(LXML_NS_NONE, attr_CloneType, U"TEXT");
-        
-        // Store original node reference
-        lString32 nodeIdStr;
-        nodeIdStr << fmt::decimal(source->getDataIndex());
-        clone->setAttributeValue(LXML_NS_NONE, attr_CloneNodeId, nodeIdStr.c_str());
-        
-        // Add the actual text as a child text node
-        lString32 text = source->getText();
-        clone->insertChildText(0, text);
+        // For text node clones, mark with empty attr_T for debugging visibility
+        clone->setAttributeValue(LXML_NS_NONE, attr_T, U"");
     }
     else if ( source->isElement() ) {
-        // Clone element node
-        lUInt16 sourceElementId = source->getNodeId();
-        
-        // Create a cloneNode element
-        clone = parent->insertChildElement( parent->getChildCount(), LXML_NS_NONE, el_cloneNode );
-        
-        // Store the original element name as CloneType
-        lString32 elementName = source->getNodeName();
-        clone->setAttributeValue(LXML_NS_NONE, attr_CloneType, elementName.c_str());
-        
-        // Store original node reference
-        lString32 nodeIdStr;
-        nodeIdStr << fmt::decimal(source->getDataIndex());
-        clone->setAttributeValue(LXML_NS_NONE, attr_CloneNodeId, nodeIdStr.c_str());
-        
-        // Copy important attributes (class, id, style, etc.)
-        for ( int i = 0; i < source->getAttrCount(); i++ ) {
-            const lxmlAttribute * attr = source->getAttribute(i);
-            if ( attr ) {
-                lUInt16 attrId = attr->id;
-                // Copy class, id, style, href, and other styling-relevant attributes
-                if ( attrId == attr_class || attrId == attr_id || attrId == attr_style ||
-                     attrId == attr_href || attrId == attr_lang || attrId == attr_dir ) {
-                    lString32 attrValue = source->getAttributeValue(attrId);
-                    clone->setAttributeValue(attr->nsid, attrId, attrValue.c_str());
-                }
-            }
-        }
-        
         // Recursively clone children
         for ( int i = 0; i < source->getChildCount(); i++ ) {
             ldomNode * childSource = source->getChildNode(i);
@@ -6569,6 +6540,34 @@ static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
     }
     
     return clone;
+#else
+    return NULL;
+#endif
+}
+
+ldomNode * ldomNode::getCloneNodeSource() const {
+#if BUILD_LITE!=1
+    // Check if this is a cloneNode element
+    if ( !isElement() || getNodeId() != el_cloneNode )
+        return NULL;
+    
+    // Get the CloneNodeId attribute
+    lString32 nodeIdStr = getAttributeValue(attr_CloneNodeId);
+    if ( nodeIdStr.empty() )
+        return NULL;
+    
+    // Parse the node data index
+    int nodeDataIndex = nodeIdStr.atoi();
+    if ( nodeDataIndex <= 0 )
+        return NULL;
+    
+    // Get the original node from the document
+    ldomDocument * doc = getDocument();
+    if ( !doc )
+        return NULL;
+    
+    ldomNode * originalNode = doc->getTinyNode(nodeDataIndex);
+    return originalNode;
 #else
     return NULL;
 #endif
