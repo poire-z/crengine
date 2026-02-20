@@ -3273,24 +3273,73 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
 {
     bool legacy_rendering = !BLOCK_RENDERING_N(enode, ENHANCED);
     
-    // Handle cloneNode elements: delegate to the original node
-    if ( enode->isElement() && enode->getNodeId() == el_cloneNode ) {
-        ldomNode * originalNode = enode->getCloneNodeSource();
-        if ( originalNode ) {
-            // Process the original node as if we encountered it directly
-            renderFinalBlock(originalNode, txform, fmt, baseflags, indent, line_h, 
-                           lang_cfg, valign_dy, is_link_start, running_bidi_ctrlchars);
-        }
-        return;
-    }
-    
     if ( enode->isElement() ) {
+        lUInt16 nodeElementId = enode->getNodeId();
+        ldomNode * originalForAttrs = NULL;
+        
+        // Special handling for cloneNode elements that represent text nodes
+        if ( nodeElementId == el_cloneNode && enode->hasAttribute(attr_T) ) {
+            // This cloneNode represents a text node from the original DOM
+            ldomNode * originalNode = enode->getCloneNodeSource();
+            if ( originalNode && originalNode->isText() ) {
+                lString32 txt = originalNode->getText();
+                if ( !txt.empty() ) {
+                    // Get style and font from the cloneNode parent (which inherits from ::first-line)
+                    ldomNode * parent = enode->getParentNode();
+                    LVFontRef const font = parent->getFont();
+                    css_style_ref_t style = parent->getStyle();
+                    
+                    lUInt32 cl = getForegroundColor(style);
+                    lUInt32 bgcl = parent->getRendMethod() == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
+                    
+                    // Apply text transform if needed
+                    switch (style->text_transform) {
+                        case css_tt_uppercase: txt.uppercase(); break;
+                        case css_tt_lowercase: txt.lowercase(); break;
+                        case css_tt_capitalize: txt.capitalize(); break;
+                        case css_tt_full_width: break;
+                        case css_tt_none:
+                        case css_tt_inherit: break;
+                    }
+                    
+                    int em = font->getSize();
+                    int letter_spacing = lengthToPx(parent, style->letter_spacing, em);
+                    lUInt32 tflags = LTEXT_FLAG_OWNTEXT;
+                    
+                    txform->AddSourceLine( txt.c_str(), txt.length(), cl, bgcl, font.get(), lang_cfg, 
+                                         baseflags | tflags, line_h, valign_dy, indent, originalNode, 0, letter_spacing );
+                    baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH;
+                }
+            }
+            return;
+        }
+        
+        // For cloneNode elements that represent element nodes (not text):
+        // Process them mostly normally, but use the original node for attribute checks
+        // and element ID, while using the clone's own style (inherited from ::first-line).
+        if ( nodeElementId == el_cloneNode ) {
+            originalForAttrs = enode->getCloneNodeSource();
+            if ( originalForAttrs && originalForAttrs->isElement() ) {
+                // Use original's element ID for checks below
+                nodeElementId = originalForAttrs->getNodeId();
+            }
+            else {
+                // Invalid cloneNode
+                return;
+            }
+        }
         lvdom_element_render_method rm = enode->getRendMethod();
         if ( rm == erm_invisible )
             return; // don't draw invisible
 
         if ( enode->hasAttribute( attr_lang ) ) {
             lString32 lang_tag = enode->getAttributeValue( attr_lang );
+            if ( !lang_tag.empty() )
+                lang_cfg = TextLangMan::getTextLangCfg( lang_tag );
+        }
+        // For cloneNode elements, also check attributes on original node
+        if ( originalForAttrs && originalForAttrs->hasAttribute( attr_lang ) ) {
+            lString32 lang_tag = originalForAttrs->getAttributeValue( attr_lang );
             if ( !lang_tag.empty() )
                 lang_cfg = TextLangMan::getTextLangCfg( lang_tag );
         }
@@ -4083,7 +4132,8 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // Don't handle dir= for the erm_final (<p dir="auto"), as it would "isolate"
             // the whole content from the bidi algorithm and we would get a default paragraph
             // direction of LTR. It is handled directly in lvtextfm.cpp.
-            bool hasDirAttribute = rm != erm_final && enode->hasAttribute( attr_dir );
+            bool hasDirAttribute = rm != erm_final && (enode->hasAttribute( attr_dir ) || 
+                                                         (originalForAttrs && originalForAttrs->hasAttribute( attr_dir )));
             bool addGeneratedContent = hasDirAttribute ||
                                        nodeElementId == el_bdi ||
                                        nodeElementId == el_bdo ||

@@ -7145,14 +7145,16 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
         return;
     }
     if ( id == el_cloneNode ) {
-        // For cloneNode, delegate to the original node
+        // For cloneNode, we need to get the original node's ID for selector matching,
+        // but apply styles to the cloneNode itself (not the original).
+        // The cloneNode needs its own style that inherits from ::first-line pseudoElem.
         ldomNode * originalNode = const_cast<ldomNode*>(node)->getCloneNodeSource();
         if ( !originalNode || originalNode->isText() ) {
             return; // Invalid cloneNode or text node
         }
-        // Apply styles to the original node (which the clone will inherit from naturally)
-        apply(originalNode, style);
-        return;
+        // Get the original element's ID and continue applying to this cloneNode
+        id = originalNode->getNodeId();
+        // Continue with selector matching using original's id, but apply to cloneNode
     }
     else if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
         // Note that a "div:before {float:left}" will result in: <div><floatBox><pseudoElem>
