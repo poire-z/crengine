@@ -6532,9 +6532,13 @@ static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
         clone->setAttributeValue(LXML_NS_NONE, attr_T, U"");
     }
     else if ( source->isElement() ) {
-        // Recursively clone children
+        // Recursively clone children, but skip pseudoElem children to avoid cycles
         for ( int i = 0; i < source->getChildCount(); i++ ) {
             ldomNode * childSource = source->getChildNode(i);
+            // Skip pseudoElem nodes (::before, ::after, ::first-line, ::first-letter)
+            // to avoid infinite recursion when cloning
+            if ( childSource->isElement() && childSource->getNodeId() == el_pseudoElem )
+                continue;
             cloneNodeRecursively(childSource, clone);
         }
     }
@@ -6610,6 +6614,12 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         firstLineElem->removeChild(0)->destroy();
     }
     
+    // Initialize firstLineElem's style BEFORE initializing children
+    // (children need their parent to have a style for inheritance)
+    if ( initStyle ) {
+        firstLineElem->initNodeStyle();
+    }
+    
     // Clone all children of this element (except the pseudoElem itself) into firstLineElem
     for ( int i = 0; i < (int)getChildCount(); i++ ) {
         ldomNode * child = getChildNode(i);
@@ -6624,13 +6634,15 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         ldomNode * clonedChild = cloneNodeRecursively(child, firstLineElem);
         if ( clonedChild && initStyle ) {
             clonedChild->initNodeStyle();
-            clonedChild->initNodeRendMethod();
+            // Don't call initNodeRendMethod() here - it should be done
+            // from children up to parent, not during tree construction
         }
     }
     
+    // Initialize rendering method for firstLineElem after all children are ready
     if ( initStyle && firstLineElem ) {
-        firstLineElem->initNodeStyle();
-        firstLineElem->initNodeRendMethod();
+        // Note: initNodeRendMethod() will be called later as part of the
+        // normal rendering method initialization pass (from children to parent)
     }
 #endif
 }
