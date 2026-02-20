@@ -6633,10 +6633,10 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         }
     }
     
-    // Initialize rendering method for firstLineElem after all children are ready
+    // Initialize rendering methods for firstLineElem and its cloned children
+    // This must be done after all children have been initialized
     if ( initStyle && firstLineElem ) {
-        // Note: initNodeRendMethod() will be called later as part of the
-        // normal rendering method initialization pass (from children to parent)
+        firstLineElem->initNodeRendMethodRecursive();
     }
 #endif
 }
@@ -7410,6 +7410,17 @@ void ldomNode::initNodeRendMethod()
     if ( isRoot() ) {
         setRendMethod(erm_block);
         return;
+    }
+    
+    // Handle cloneNode: copy render method from original node
+    if ( getNodeId() == el_cloneNode ) {
+        ldomNode * originalNode = getCloneNodeSource();
+        if ( originalNode && originalNode->isElement() ) {
+            // Copy the render method from the original
+            // The original's initNodeRendMethod has already been called (or will be)
+            setRendMethod(originalNode->getRendMethod());
+            return;
+        }
     }
 
     // DEBUG TEST
