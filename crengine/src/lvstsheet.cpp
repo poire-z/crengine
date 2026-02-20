@@ -6340,7 +6340,30 @@ bool LVCssSelectorRule::checkNextRules( const ldomNode * node, bool allow_cache 
 bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
 {
     lUInt16 nodeId = node->getNodeId();
-    if ( nodeId == el_pseudoElem ) {
+    
+    // Handle cloneNode elements: they should match as if they were the original element
+    if ( nodeId == el_cloneNode ) {
+        // Get the CloneType attribute which contains the original element name
+        lString32 cloneType = node->getAttributeValue(attr_CloneType);
+        if ( cloneType.empty() ) {
+            return false; // Invalid cloneNode
+        }
+        
+        // Special case: TEXT clones are like text nodes, don't match element selectors
+        if ( cloneType == U"TEXT" ) {
+            return false;
+        }
+        
+        // Get the element ID from the element name
+        nodeId = node->getDocument()->getElementNameIndex(cloneType.c_str());
+        if ( nodeId == 0 ) {
+            return false; // Unknown element name
+        }
+        
+        // Continue checking with this nodeId as if it were the original element
+        // The node pointer stays the same so attribute matching works on the clone
+    }
+    else if ( nodeId == el_pseudoElem ) {
         if ( !_pseudo_elem ) { // not a ::before/after/first-letter/first-line rule
             // Our added pseudoElem element should not match any other rules
             // (if we added it as a child of a P element, it should not match P > *)
@@ -7127,7 +7150,19 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
         // (other normal <body> have a non-root parent: <html>)
         return;
     }
-    if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
+    if ( id == el_cloneNode ) {
+        // For cloneNode, get the element ID from CloneType attribute
+        lString32 cloneType = node->getAttributeValue(attr_CloneType);
+        if ( cloneType.empty() || cloneType == U"TEXT" ) {
+            return; // Invalid or text cloneNode
+        }
+        id = node->getDocument()->getElementNameIndex(cloneType.c_str());
+        if ( id == 0 ) {
+            return; // Unknown element name
+        }
+        // Continue with this id for selector matching
+    }
+    else if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
         // Note that a "div:before {float:left}" will result in: <div><floatBox><pseudoElem>
         if ( node->hasAttribute(attr_FirstLetter) ) {
             // For ::first-letter, find the ancestor with HasFirstLetter attribute

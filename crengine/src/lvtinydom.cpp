@@ -6509,13 +6509,77 @@ ldomNode * ldomNode::getFirstLetterTextNode() const
     return NULL;
 }
 
+// Helper function to recursively clone a node and its children for ::first-line
+static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
+#if BUILD_LITE!=1
+    if ( !source || !parent )
+        return NULL;
+    
+    ldomNode * clone = NULL;
+    
+    if ( source->isText() ) {
+        // Clone text node: create a cloneNode element with CloneType="TEXT"
+        clone = parent->insertChildElement( parent->getChildCount(), LXML_NS_NONE, el_cloneNode );
+        clone->setAttributeValue(LXML_NS_NONE, attr_CloneType, U"TEXT");
+        
+        // Store original node reference
+        lString32 nodeIdStr;
+        nodeIdStr << fmt::decimal(source->getDataIndex());
+        clone->setAttributeValue(LXML_NS_NONE, attr_CloneNodeId, nodeIdStr.c_str());
+        
+        // Add the actual text as a child text node
+        lString32 text = source->getText();
+        clone->insertChildText(0, text);
+    }
+    else if ( source->isElement() ) {
+        // Clone element node
+        lUInt16 sourceElementId = source->getNodeId();
+        
+        // Create a cloneNode element
+        clone = parent->insertChildElement( parent->getChildCount(), LXML_NS_NONE, el_cloneNode );
+        
+        // Store the original element name as CloneType
+        lString32 elementName = source->getNodeName();
+        clone->setAttributeValue(LXML_NS_NONE, attr_CloneType, elementName.c_str());
+        
+        // Store original node reference
+        lString32 nodeIdStr;
+        nodeIdStr << fmt::decimal(source->getDataIndex());
+        clone->setAttributeValue(LXML_NS_NONE, attr_CloneNodeId, nodeIdStr.c_str());
+        
+        // Copy important attributes (class, id, style, etc.)
+        for ( int i = 0; i < source->getAttrCount(); i++ ) {
+            const lxmlAttribute * attr = source->getAttribute(i);
+            if ( attr ) {
+                lUInt16 attrId = attr->id;
+                // Copy class, id, style, href, and other styling-relevant attributes
+                if ( attrId == attr_class || attrId == attr_id || attrId == attr_style ||
+                     attrId == attr_href || attrId == attr_lang || attrId == attr_dir ) {
+                    lString32 attrValue = source->getAttributeValue(attrId);
+                    clone->setAttributeValue(attr->nsid, attrId, attrValue.c_str());
+                }
+            }
+        }
+        
+        // Recursively clone children
+        for ( int i = 0; i < source->getChildCount(); i++ ) {
+            ldomNode * childSource = source->getChildNode(i);
+            cloneNodeRecursively(childSource, clone);
+        }
+    }
+    
+    return clone;
+#else
+    return NULL;
+#endif
+}
+
 void ldomNode::ensureFirstLine(bool initStyle) {
 #if BUILD_LITE!=1
-    // This method handles ::first-line pseudo element creation.
-    // Unlike ::first-letter, the ::first-line pseudo element is a style carrier only:
-    // it holds no text content and is not rendered directly. Its computed style (font,
-    // color, etc.) is extracted in ldomNode::renderFinalBlock() and stored in the
-    // LFormattedText buffer, which then marks words on the first formatted line.
+    // This method handles ::first-line pseudo element creation by cloning
+    // the paragraph's inner DOM subtree into the pseudoElem[FirstLine].
+    // The clones naturally inherit from the ::first-line style, solving
+    // the measurement/layout issue.
 
     // Ensure the HasFirstLine attribute is set on this element
     if ( !hasAttribute(attr_HasFirstLine) ) {
@@ -6523,25 +6587,49 @@ void ldomNode::ensureFirstLine(bool initStyle) {
     }
 
     // Check if we already have a FirstLine pseudoElem child
+    ldomNode * firstLineElem = NULL;
     for ( int i = 0; i < (int)getChildCount(); i++ ) {
         ldomNode * child = getChildNode(i);
         if ( child && child->isElement() && child->getNodeId() == el_pseudoElem
                    && child->hasAttribute(attr_FirstLine) ) {
-            // Already exists; reinitialize its style if requested
-            if ( initStyle ) {
-                child->initNodeStyle();
-                child->initNodeRendMethod();
-            }
-            return;
+            firstLineElem = child;
+            break;
         }
     }
 
-    // Create the FirstLine pseudo element as the first child of this element.
-    // It is a style carrier only; has no text content and will have display:none
-    // by default (set to inline by matching ::first-line rules via applyToPseudoElement).
-    ldomNode * firstLineElem = insertChildElement( 0, LXML_NS_NONE, el_pseudoElem );
-    firstLineElem->setAttributeValue(LXML_NS_NONE, attr_FirstLine, U"");
-    if ( initStyle ) {
+    if ( !firstLineElem ) {
+        // Create the FirstLine pseudo element as the first child of this element.
+        firstLineElem = insertChildElement( 0, LXML_NS_NONE, el_pseudoElem );
+        firstLineElem->setAttributeValue(LXML_NS_NONE, attr_FirstLine, U"");
+        
+        // Set style to make it an inline-block with 100% width
+        // This will be done via CSS or in initNodeStyle
+    }
+    
+    // Clear any existing clones in the pseudoElem
+    while ( firstLineElem->getChildCount() > 0 ) {
+        firstLineElem->removeChild(0)->destroy();
+    }
+    
+    // Clone all children of this element (except the pseudoElem itself) into firstLineElem
+    for ( int i = 0; i < (int)getChildCount(); i++ ) {
+        ldomNode * child = getChildNode(i);
+        if ( child == firstLineElem ) {
+            continue; // Skip the pseudoElem itself
+        }
+        if ( child->getNodeId() == el_pseudoElem ) {
+            continue; // Skip other pseudo elements (::before, ::after, etc.)
+        }
+        
+        // Clone this child into the firstLineElem
+        ldomNode * clonedChild = cloneNodeRecursively(child, firstLineElem);
+        if ( clonedChild && initStyle ) {
+            clonedChild->initNodeStyle();
+            clonedChild->initNodeRendMethod();
+        }
+    }
+    
+    if ( initStyle && firstLineElem ) {
         firstLineElem->initNodeStyle();
         firstLineElem->initNodeRendMethod();
     }

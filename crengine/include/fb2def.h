@@ -55,6 +55,12 @@ XS_TAG1I( inlineBox )
 // It does not box anything and has no child, so it's not considered a boxing node.
 XS_TAG1D( pseudoElem, false, css_d_none, css_ws_inherit )
 
+// Internal element created for ::first-line DOM cloning:
+//  - clones of source elements/text inside pseudoElem[FirstLine]
+//  - inherits display and white-space from its CloneType
+//  - stores reference to original node for CSS matching
+XS_TAG1D( cloneNode, false, css_d_inherit, css_ws_inherit )
+
 // Internal element for EPUB, containing each individual HTML file
 XS_TAG1( DocFragment )
 
@@ -449,6 +455,8 @@ XS_ATTR( FirstLetter )    // for pseudoElem internal element (the actual first-l
 XS_ATTR( HasFirstLetter ) // on elements matched by ::first-letter that will get an inner pseudoElem FirstLetter
 XS_ATTR( FirstLine )      // for pseudoElem internal element (the ::first-line style carrier)
 XS_ATTR( HasFirstLine )   // on elements matched by ::first-line that will get an inner pseudoElem FirstLine
+XS_ATTR( CloneType )      // for cloneNode: stores the element name ID of the cloned element
+XS_ATTR( CloneNodeId )    // for cloneNode: stores the data index of the original node
 XS_ATTR( ParserHint )   // HTML parser hints (used for Lib.ru support)
 XS_ATTR( NonLinear )    // for non-linear items in EPUB
 XS_ATTR( Source )       // set on DocFragment to the path of the file in the EPUB, for info
