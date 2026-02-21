@@ -6688,7 +6688,7 @@ void ldomNode::ensureFirstLine(bool initStyle) {
     } else if ( initStyle ) {
         // CloneNodes already exist, just re-initialize their styles recursively
         // (cloneNodes may have nested cloneNodes for nested elements like <b>)
-        firstLineElem->initNodeStyleRecursive();
+        firstLineElem->initNodeStyleRecursive( NULL );
     }
     
     // Note: Don't call initNodeRendMethodRecursive() here.

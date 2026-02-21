@@ -954,6 +954,8 @@ public:
     void initNodeRendMethodRecursive();
     /// init render method for the whole subtree
     void initNodeStyleRecursive( LVDocViewCallback * progressCallback );
+    /// copy render methods from original nodes to their clones in ::first-line pseudoElems
+    void copyFirstLineRendMethodsRecursive();
 
     /// gather snippets from all stylesheets involved that this node would match
     void gatherStylesheetMatchingRulesets(const lString8 & css, bool include_document_stylesheets, lString8Collection & matches);
