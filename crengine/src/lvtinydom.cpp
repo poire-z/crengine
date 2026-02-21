@@ -5424,9 +5424,6 @@ bool ldomDocument::partialRender( ldomNode * node ) {
     _styleSheetCache.clear();
     _stylesheet.pop();
     node->initNodeRendMethodRecursive();
-    
-    // Copy render methods from originals to clones for all ::first-line pseudoElems
-    copyFirstLineRendMethodsRecursive(node);
 
     // Render this DocFragment, and build a new pages list (as if this DocFrament was a standalone document)
     _renderedBlockCache.reduceSize(1); // Reduce size to save some checking and trashing time
@@ -5626,9 +5623,6 @@ bool ldomDocument::render( LVRendPageList * pages, LVDocViewCallback * callback,
 
         CRLog::trace("init render method...");
         getRootNode()->initNodeRendMethodRecursive();
-        
-        // Copy render methods from originals to clones for all ::first-line pseudoElems
-        copyFirstLineRendMethodsRecursive(getRootNode());
 
 //        getRootNode()->setFont( _def_font );
 //        getRootNode()->setStyle( _def_style );
@@ -6577,62 +6571,6 @@ ldomNode * ldomNode::getCloneNodeSource() const {
 #endif
 }
 
-// Helper function to recursively copy render methods from original nodes to their clones
-static void copyRendMethodToClones(ldomNode * cloneNode) {
-    if (!cloneNode || !cloneNode->isElement())
-        return;
-    
-    // If this is a cloneNode, copy the render method from its original
-    if (cloneNode->getNodeId() == el_cloneNode) {
-        ldomNode * originalNode = cloneNode->getCloneNodeSource();
-        if (originalNode && originalNode->isElement()) {
-            cloneNode->setRendMethod(originalNode->getRendMethod());
-        }
-    }
-    
-    // Recursively process children
-    int cnt = cloneNode->getChildCount();
-    for (int i = 0; i < cnt; i++) {
-        ldomNode * child = cloneNode->getChildNode(i);
-        if (child && child->isElement()) {
-            copyRendMethodToClones(child);
-        }
-    }
-}
-
-// Helper to recursively copy render methods for all FirstLine pseudoElems in the tree
-static void copyFirstLineRendMethodsRecursive(ldomNode * node) {
-    if (!node || !node->isElement())
-        return;
-    
-    // If this node has a FirstLine pseudoElem, copy render methods
-    if (node->hasAttribute(attr_HasFirstLine)) {
-        node->copyRendMethodsToFirstLineClones();
-    }
-    
-    // Recursively process children
-    int cnt = node->getChildCount();
-    for (int i = 0; i < cnt; i++) {
-        ldomNode * child = node->getChildNode(i);
-        if (child && child->isElement()) {
-            copyFirstLineRendMethodsRecursive(child);
-        }
-    }
-}
-
-// Helper to copy render methods from original nodes to clones within FirstLine pseudoElem
-void ldomNode::copyRendMethodsToFirstLineClones() {
-#if BUILD_LITE!=1
-    // Find the FirstLine pseudoElem (may be boxed)
-    ldomNode * firstLineElem = getUnboxedFirstChild(true, el_pseudoElem);
-    if (!firstLineElem || !firstLineElem->hasAttribute(attr_FirstLine))
-        return;
-    
-    // Recursively copy render methods for all cloneNodes
-    copyRendMethodToClones(firstLineElem);
-#endif
-}
-
 void ldomNode::ensureFirstLine(bool initStyle) {
 #if BUILD_LITE!=1
     // This method handles ::first-line pseudo element creation by cloning
@@ -6686,15 +6624,20 @@ void ldomNode::ensureFirstLine(bool initStyle) {
             }
         }
     } else if ( initStyle ) {
-        // CloneNodes already exist, just re-initialize their styles recursively
-        // (cloneNodes may have nested cloneNodes for nested elements like <b>)
-        firstLineElem->initNodeStyleRecursive( NULL );
+        // CloneNodes already exist, just re-initialize their styles
+        for ( int i = 0; i < (int)firstLineElem->getChildCount(); i++ ) {
+            ldomNode * child = firstLineElem->getChildNode(i);
+            if ( child ) {
+                child->initNodeStyle();
+            }
+        }
     }
     
-    // Note: Don't call initNodeRendMethodRecursive() here.
-    // Render methods are initialized via the normal recursive tree walk from the root.
-    // After that completes, we copy render methods from originals to clones
-    // (see copyRendMethodsToClones() call in setNodeStyle or rendering code)
+    // Initialize rendering method for firstLineElem after all children are ready
+    if ( initStyle && firstLineElem ) {
+        // Note: initNodeRendMethod() will be called later as part of the
+        // normal rendering method initialization pass (from children to parent)
+    }
 #endif
 }
 
@@ -7466,15 +7409,6 @@ void ldomNode::initNodeRendMethod()
         return;
     if ( isRoot() ) {
         setRendMethod(erm_block);
-        return;
-    }
-    
-    // Handle cloneNode: For now, set to inline. The correct render method will be
-    // copied from the original node after the full tree has been initialized.
-    // We can't copy here because during recursive initialization, the original
-    // node might not be processed yet (clones are processed before their siblings).
-    if ( getNodeId() == el_cloneNode ) {
-        setRendMethod(erm_inline);
         return;
     }
 
