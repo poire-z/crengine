@@ -4455,6 +4455,9 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
         
         // For cloneNode text elements, get the original text node
         if ( isCloneText ) {
+            if ( enode->getRendMethod() == erm_invisible ) {
+                return; // don't draw invisible
+            }
             textSourceNode = enode->getCloneNodeSource();
             if ( !textSourceNode || !textSourceNode->isText() ) {
                 return; // Invalid cloneNode
@@ -10686,6 +10689,15 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // init default style attribute values
     const css_elem_def_props_t * type_ptr = enode->getElementTypePtr();
     bool is_object = enode->isImage();
+
+    ldomNode * originalNode = enode;
+    if ( nodeElementId == el_cloneNode ) {
+        originalNode = enode->getCloneNodeSource();
+        nodeElementId = originalNode->getNodeId();
+        type_ptr = originalNode->getElementTypePtr();
+        is_object = originalNode->isImage();
+    }
+
     if (type_ptr) {
         pstyle->display = type_ptr->display;
         pstyle->white_space = type_ptr->white_space;
@@ -10812,8 +10824,8 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     //////////////////////////////////////////////////////
     // apply node style= attribute
     //////////////////////////////////////////////////////
-    if ( doc->getDocFlag(DOC_FLAG_ENABLE_INTERNAL_STYLES) && enode->hasAttribute( LXML_NS_ANY, attr_style ) ) {
-        lString32 nodeStyle = enode->getAttributeValue( LXML_NS_ANY, attr_style );
+    if ( doc->getDocFlag(DOC_FLAG_ENABLE_INTERNAL_STYLES) && originalNode->hasAttribute( LXML_NS_ANY, attr_style ) ) {
+        lString32 nodeStyle = originalNode->getAttributeValue( LXML_NS_ANY, attr_style );
         if ( !nodeStyle.empty() ) {
             nodeStyle = cs32("{") + nodeStyle + "}";
             LVCssDeclaration decl;

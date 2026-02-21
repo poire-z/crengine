@@ -59,7 +59,7 @@ XS_TAG1D( pseudoElem, false, css_d_none, css_ws_inherit )
 //  - clones of source elements/text inside pseudoElem[FirstLine]
 //  - inherits display and white-space from its CloneType
 //  - stores reference to original node for CSS matching
-XS_TAG1D( cloneNode, false, css_d_inherit, css_ws_inherit )
+XS_TAG1D( cloneNode, false, css_d_none, css_ws_inherit )
 
 // Internal element for EPUB, containing each individual HTML file
 XS_TAG1( DocFragment )

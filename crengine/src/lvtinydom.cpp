@@ -6601,12 +6601,6 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         // This will be done via CSS or in initNodeStyle
     }
     
-    // Initialize firstLineElem's style BEFORE initializing children
-    // (children need their parent to have a style for inheritance)
-    if ( initStyle ) {
-        firstLineElem->initNodeStyle();
-    }
-    
     // Only clone children if the pseudoElem doesn't already have cloneNodes
     // This keeps the DOM stable across multiple ensureFirstLine() calls
     if ( firstLineElem->getChildCount() == 0 ) {
@@ -6614,29 +6608,19 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         // Skip the first child (i=1) since it's the firstLineElem itself (possibly boxed)
         for ( int i = 1; i < (int)getChildCount(); i++ ) {
             ldomNode * child = getChildNode(i);
-            
             // Clone this child into the firstLineElem
             ldomNode * clonedChild = cloneNodeRecursively(child, firstLineElem);
-            if ( clonedChild && initStyle ) {
-                clonedChild->initNodeStyle();
-                // Don't call initNodeRendMethod() here - it should be done
-                // from children up to parent, not during tree construction
-            }
-        }
-    } else if ( initStyle ) {
-        // CloneNodes already exist, just re-initialize their styles
-        for ( int i = 0; i < (int)firstLineElem->getChildCount(); i++ ) {
-            ldomNode * child = firstLineElem->getChildNode(i);
-            if ( child ) {
-                child->initNodeStyle();
-            }
         }
     }
     
-    // Initialize rendering method for firstLineElem after all children are ready
-    if ( initStyle && firstLineElem ) {
-        // Note: initNodeRendMethod() will be called later as part of the
-        // normal rendering method initialization pass (from children to parent)
+    // Initialize styles and rendering methods for firstLineElem after all children are ready
+    if ( initStyle ) {
+        firstLineElem->initNodeStyleRecursive(NULL); // (no callback)
+        // We have set styles, we can initNodeRendMethod.
+        // initNodeRendMethod() would need some update to either pick the rendmethod from
+        // the source nodes, or properly fetch nodeid, styles, text content from the
+        // source nodes. But this will do for now.
+        firstLineElem->initNodeRendMethodRecursive();
     }
 #endif
 }
