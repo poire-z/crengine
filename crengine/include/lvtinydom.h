@@ -935,6 +935,10 @@ public:
     // (initStyle: whether to call initNodeStyle() on newly created pseudoElem)
     void ensureFirstLine(bool initStyle=false);
     
+    /// Copy render methods from original nodes to clones in the FirstLine pseudoElem
+    /// Should be called after initNodeRendMethodRecursive() completes
+    void copyRendMethodsToFirstLineClones();
+    
     /// Get the original node from a cloneNode element (for ::first-line)
     /// Returns NULL if this is not a cloneNode or if the original node cannot be found
     ldomNode * getCloneNodeSource() const;
