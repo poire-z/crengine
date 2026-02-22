@@ -2299,6 +2299,31 @@ void RenderRectAccessor::setInvolvedFloatIds( int float_count, lUInt32 * float_i
     if (float_count > 4) _extra5 = float_ids[4];
     _modified = true;
 }
+int RenderRectAccessor::getAfterFirstLineRestartOffset()
+{
+    if ( _dirty ) {
+        _dirty = false;
+        _node->getRenderData(*this);
+#ifdef DEBUG_RENDER_RECT_ACCESS
+        rr_lock( _node );
+#endif
+    }
+    return _extra1;
+}
+void RenderRectAccessor::setAfterFirstLineRestartOffset( int offset )
+{
+    if ( _dirty ) {
+        _dirty = false;
+        _node->getRenderData(*this);
+#ifdef DEBUG_RENDER_RECT_ACCESS
+        rr_lock( _node );
+#endif
+    }
+    if ( _extra1 != offset ) {
+        _extra1 = offset;
+        _modified = true;
+    }
+}
 
 #endif
 
@@ -21327,6 +21352,13 @@ int ldomNode::renderFinalBlock(  LFormattedTextRef & frmtext, RenderRectAccessor
     int usable_left_overflow = fmt->getUsableLeftOverflow();
     int usable_right_overflow = fmt->getUsableRightOverflow();
 
+    // XXX
+    bool is_FirstLinePseudoElem = getNodeId() == el_pseudoElem && hasAttribute(attr_FirstLine)
+                && getParentNode()->getNodeId() == el_inlineBox;
+    if ( is_FirstLinePseudoElem ) {
+        f->requestStopAfterFirstLine();
+    }
+
     // Note: some properties are set into LFormattedText by lvrend.cpp's renderFinalBlock(),
     // while some others are only passed below as parameters to LFormattedText->Format().
     // The former should logically be source inner content properties (strut, text indent)
@@ -21341,6 +21373,14 @@ int ldomNode::renderFinalBlock(  LFormattedTextRef & frmtext, RenderRectAccessor
     int h = f->Format((lUInt16)width, (lUInt16)page_h, direction, usable_left_overflow, usable_right_overflow,
                             getDocument()->getHangingPunctiationEnabled(), float_footprint);
     frmtext = f;
+
+    if ( is_FirstLinePseudoElem ) {
+        int restart_offset = f->getRestartAfterFirstLineOffset();
+        RenderRectAccessor pfmt( getParentNode() );
+        pfmt.setAfterFirstLineRestartOffset(restart_offset);
+        pfmt.push();
+    }
+
     //CRLog::trace("Created new formatted object for node #%08X", (lUInt32)this);
     return h;
 }

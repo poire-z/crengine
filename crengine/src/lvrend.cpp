@@ -10943,6 +10943,9 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
         pstyle->display = css_d_inline_block;
         pstyle->width.type = css_val_percent;
         pstyle->width.value = 100 * 256; // 100% in fixed point (256 = 1.0)
+        // XXX somehow, the first line is shown again if we don't use 100 % ?!!
+        // XXX not a real issue, but I'd like to undestand why !
+        // pstyle->width.value = 90 * 256; // XXX
     }
 
     if ( BLOCK_RENDERING(rend_flags, PREPARE_FLOATBOXES) ) {
@@ -11674,7 +11677,11 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         printf("GRW node: %s\n", UnicodeToLocal(ldomXPointer(node, 0).toString()).c_str());
     #endif
 
-    if ( node->isElement() && !processNodeAsText ) {
+    // Early check for cloneNode text elements to route them to text handling
+    bool isCloneText = node->isElement() && node->getNodeId() == el_cloneNode && node->hasAttribute(attr_T);
+    // XXX get attributes from original node
+
+    if ( node->isElement() && !isCloneText && !processNodeAsText ) {
         lUInt16 nodeElementId = node->getNodeId();
         int m = node->getRendMethod();
         if (m == erm_invisible)
@@ -12406,8 +12413,14 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         int start = 0;
         int len = 0;
         ldomNode * parent;
-        if ( node->isText() ) {
-            text = node->getText();
+        if ( node->isText() || isCloneText ) {
+            if ( isCloneText ) {
+                ldomNode * textSourceNode = node->getCloneNodeSource();
+                text = textSourceNode->getText();
+            }
+            else {
+                text = node->getText();
+            }
             len = text.length();
             parent = node->getParentNode();
             // Check if this text node has a preceding FirstLetter pseudoElem

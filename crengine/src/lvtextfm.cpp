@@ -148,6 +148,8 @@ formatted_text_fragment_t * lvtextAllocFormatter( lUInt16 width )
     pbuffer->strut_baseline = 0;
     pbuffer->is_reusable = true;
     pbuffer->light_formatting = false;
+    pbuffer->stop_after_first_line = false;
+    pbuffer->restart_offset = 0;
     int defMode = MAX_IMAGE_SCALE_MUL > 1 ? (ARBITRARY_IMAGE_SCALE_ENABLED==1 ? 2 : 1) : 0;
     int defMult = MAX_IMAGE_SCALE_MUL;
     // mode: 0=disabled, 1=integer scaling factors, 2=free scaling
@@ -2243,6 +2245,22 @@ public:
                         // a verbose inline box. Not really knowing that and what comes after,
                         // give up on ensuring locked spacing.
                         first_word_len = -1;
+
+                        // XXX our use a RENDER_RECT flag ?
+                        if ( start == 0 && node->getChildNode(0)->getNodeId() == el_pseudoElem &&
+                                           node->getChildNode(0)->hasAttribute(attr_FirstLine) ) {
+                            // It is our first-line pseudoElem, containing clones of our inline
+                            // nodes and text.
+                            // It's rendering should have stopped after the first line, and
+                            // save in its RenderRectAccessor the node index and offset where
+                            // we should start rendering the next lines
+                            int restart_offset = fmt.getAfterFirstLineRestartOffset();
+                            printf("firstline restart (%d) at offset %d , inlineBox w=%d\n", start, restart_offset, width);
+                            restart_offset += 1; // XXX We have that pseudoElem at first char
+                            // i = restart_offset; // continue measuring from there
+                                // Somehow some issues if we change i ?!
+                            m_pbuffer->restart_offset = restart_offset; // and start other stuff from  there
+                        }
                     }
                     else if ( m_charindex[start] == IMAGE_CHAR_INDEX ) {
                         // measure image
@@ -4721,6 +4739,7 @@ public:
 
         // split paragraph into lines, export lines
         int pos = 0;
+
         #if (USE_LIBUNIBREAK!=1)
         int upSkipPos = -1;
         #endif
@@ -5310,7 +5329,14 @@ public:
             // Best position to end this line found.
             bool hasInlineBoxes = firstInlineBoxPos >= 0 && firstInlineBoxPos < endp;
             addLine(pos, endp, x, para, pos==0, wrapPos>=m_length-1, preFormattedOnly, isLastPara, hasInlineBoxes);
+
+            bool has_first_line = firstInlineBoxPos == 0 && m_pbuffer->restart_offset;
             pos = wrapPos + 1; // start of next line
+
+            if (has_first_line) {
+                printf("has_first_line pos=%d > %d\n", pos, m_pbuffer->restart_offset);
+                pos = m_pbuffer->restart_offset;
+            }
 
             #if (USE_LIBUNIBREAK==1)
             // (Only when using libunibreak, which we trust decisions to wrap on hyphens.)
@@ -5327,6 +5353,13 @@ public:
                 }
             }
             #endif
+
+            // XXX done if stop after first line
+            if ( m_pbuffer->stop_after_first_line ) {
+                m_pbuffer->restart_offset = pos;
+                return;
+            }
+
         }
     }
 
@@ -5465,6 +5498,9 @@ public:
                 }
                 else {
                     processParagraph( start, i, isLastPara );
+                }
+                if ( m_pbuffer->stop_after_first_line ) {
+                    break;
                 }
                 start = i;
             }

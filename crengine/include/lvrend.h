@@ -42,6 +42,7 @@
 #define RENDER_RECT_FLAG_CHILDREN_RENDERING_REORDERED       0x0200 // for table rows/thead/tfoot/cells reordering
 #define RENDER_RECT_FLAG_BOX_IS_POSITIONNED                 0x0400 // for inlineBox (when X/Y set in its erm_final)
 #define RENDER_RECT_FLAG_DO_MATH_TRANSFORM                  0x0800 // do math glyph stretching
+#define RENDER_RECT_FLAG_IS_FIRST_LINE_INLINE_BLOCK         0x1000 // inline block used for CSS ::first-line rendering
 #define RENDER_RECT_FLAG_TEMP_USED_AS_CSS_CHECK_CACHE       0x8000 // has been cleared and is used as a CSS checks cache
 
 #define RENDER_RECT_SET_FLAG(r, f)     ( r.setFlags( r.getFlags() | RENDER_RECT_FLAG_##f ) )

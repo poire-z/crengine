@@ -327,6 +327,10 @@ typedef struct
    // (e.g. when full rerendering). This will make is_reusable=true too.
    bool                  light_formatting;
 
+   // For CSS ::first-line support
+   bool                  stop_after_first_line;
+   int                   restart_offset;
+
 } formatted_text_fragment_t;
 
 /**  Alloc & init formatted text buffer
@@ -518,6 +522,11 @@ public:
 
     bool isReusable() { return m_pbuffer->is_reusable; }
     void requestLightFormatting() { m_pbuffer->light_formatting = true; }
+
+    void requestStopAfterFirstLine() { m_pbuffer->stop_after_first_line = true; }
+    int getRestartAfterFirstLineOffset() {
+        return m_pbuffer->restart_offset;
+    }
 
     LFormattedText() { m_pbuffer = lvtextAllocFormatter( 0 ); }
 
