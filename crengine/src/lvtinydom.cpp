@@ -21301,34 +21301,6 @@ int ldomNode::renderFinalBlock(  LFormattedTextRef & frmtext, RenderRectAccessor
     // survive when leaving this function (some callers do use it).
     cache.set( this, f );
 
-    // If this block has a ::first-line pseudo-element style carrier, extract
-    // its font and color for use in marking first-line words during formatting.
-    if ( hasAttribute(attr_HasFirstLine) ) {
-        for ( int ci = 0; ci < (int)getChildCount(); ci++ ) {
-            ldomNode * child = getChildNode(ci);
-            if ( child && child->isElement() && child->getNodeId() == el_pseudoElem
-                       && child->hasAttribute(attr_FirstLine) ) {
-                // Found the ::first-line style carrier; extract its font and color.
-                // Compute the foreground color (returns LTEXT_COLOR_CURRENT if not
-                // explicitly set in ::first-line rules, i.e. only inherited).
-                css_style_ref_t flStyle = child->getStyle();
-                if ( !flStyle.isNull() && flStyle->display != css_d_none ) {
-                    LVFontRef flFont = child->getFont();
-                    lUInt32 flColor;
-                    if ( flStyle->color.type == css_val_color )
-                        flColor = LTEXT_COLOR_IS_RESERVED(flStyle->color.value) ?
-                                    LTEXT_COLOR_RESERVED_REPLACE : flStyle->color.value;
-                    else
-                        flColor = LTEXT_COLOR_CURRENT;
-                    if ( !flFont.isNull() ) {
-                        f->setFirstLineStyle(flFont.get(), flColor);
-                    }
-                }
-                break;
-            }
-        }
-    }
-
     // Gather some outer properties and context, so we can format (render)
     // the inner content in that context.
     // This page_h we provide to f->Format() is only used to enforce a max height to images

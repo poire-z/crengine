@@ -204,7 +204,7 @@ typedef struct
 #define LTEXT_WORD_VALIGN_BOTTOM             0x2000 /// word is to be vertical-align: bottom
 #define LTEXT_WORD_STRUT_CONFINED            0x4000 /// word is to be fully contained into strut bounds
                                                     /// (used only when one of the 2 previous is set)
-#define LTEXT_WORD_IS_FIRST_LINE             0x8000  /// word is on the first formatted line (for ::first-line pseudo-element)
+#define LTEXT_WORD__AVAILABLE_BIT_16__       0x8000
 
 //#define LTEXT_BACKGROUND_MARK_FLAGS 0xFFFF0000l
 
@@ -326,11 +326,6 @@ typedef struct
    // Avoid some work when formatting to only get the block height
    // (e.g. when full rerendering). This will make is_reusable=true too.
    bool                  light_formatting;
-
-   // ::first-line pseudo-element style overrides for the first formatted line
-   LVFont *              first_line_font;    ///< font override for ::first-line (NULL if none)
-   lUInt32               first_line_color;   ///< color override for ::first-line
-   bool                  has_first_line_style; ///< true if ::first-line style is active
 
 } formatted_text_fragment_t;
 
@@ -523,13 +518,6 @@ public:
 
     bool isReusable() { return m_pbuffer->is_reusable; }
     void requestLightFormatting() { m_pbuffer->light_formatting = true; }
-
-    /// set first-line style overrides for ::first-line pseudo-element
-    void setFirstLineStyle(LVFont * font, lUInt32 color) {
-        m_pbuffer->first_line_font  = font;
-        m_pbuffer->first_line_color = color;
-        m_pbuffer->has_first_line_style = true;
-    }
 
     LFormattedText() { m_pbuffer = lvtextAllocFormatter( 0 ); }
 
