@@ -6608,7 +6608,7 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         for ( int i = 1; i < (int)getChildCount(); i++ ) {
             ldomNode * child = getChildNode(i);
             // Clone this child into the firstLineElem
-            ldomNode * clonedChild = cloneNodeRecursively(child, firstLineElem);
+            cloneNodeRecursively(child, firstLineElem);
         }
     }
     
@@ -10180,7 +10180,7 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
                 lUInt16 width[512];
                 lUInt8 flg[512];
 
-                lString32 str = node->getText();
+                lString32 str = node->getEffectiveText();
                 // We need to transform the node text as it had been when
                 // rendered (the transform may change chars widths) for the
                 // XPointer offset to be correct
@@ -10228,11 +10228,11 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
                             // after the logical end of that RTL word
                         }
                     }
-                    if ( node->isElement() ) // possibly some <br> or generated text not part of a text node
-                        return ldomXPointer(node, 0);
+                    if ( node->isEffectiveElement() ) // possibly some <br> or generated text not part of a text node
+                        return ldomXPointer(node->getEffectiveNode(), 0);
                     // printf("word %d/%d, len=%d indice=%d (%d > %d + %d - %d)\n", w+1, wc, word->t.len,
                     //              pos, x, word->x, word->width, pos<word->t.len?width[pos]:-1);
-                    return ldomXPointer( node, word->t.start + pos );
+                    return ldomXPointer( node->getEffectiveNode(), word->t.start + pos );
                 }
                 else {
                     int pos = word->t.len; // default to after this word if we don't find better
@@ -10262,11 +10262,11 @@ ldomXPointer ldomDocument::createXPointer( lvPoint pt, int direction, bool stric
                             // Otherwise (not sure if can happen): use the default of word->t.len
                         }
                     }
-                    if ( node->isElement() ) // possibly some <br> or generated text not part of a text node
-                        return ldomXPointer(node, 0);
+                    if ( node->isEffectiveElement() ) // possibly some <br> or generated text not part of a text node
+                        return ldomXPointer(node->getEffectiveNode(), 0);
                     // printf("word %d/%d, len=%d indice=%d (%d < %d + %d)\n", w+1, wc, word->t.len,
                     //              pos, x, word->x, pos<word->t.len?width[pos]:-1);
-                    return ldomXPointer( node, word->t.start + pos );
+                    return ldomXPointer( node->getEffectiveNode(), word->t.start + pos );
                 }
                 /* Previously, we returned differently whether x was in the left or in the right half of a glyph:
                 if ( word_is_rtl ) {
@@ -10457,6 +10457,8 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
 //        }
 
         // text node
+        int firstLineSrcIndex = -1;
+        int laterLineSrcIndex = -1;
         int srcIndex = -1;
         int srcLen = -1;
         int lastIndex = -1;
@@ -10468,7 +10470,8 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
             bool isObject = (src->flags&LTEXT_SRC_IS_OBJECT)!=0;
             if ( isObject && src->o.objflags & LTEXT_OBJECT_IS_FLOAT ) // skip floats
                 continue;
-            if ( src->object == node ) {
+            bool is_first_line = src->flags & LTEXT_IS_FIRST_LINE_CLONE;
+            if ( src->object == node || (is_first_line && src->object && ((ldomNode*)(src->object))->getEffectiveNode() == node)) {
                 // Check and handle the case of ::first-letter
                 if ( src->t.offset > 0 && offset < src->t.offset) {
                     // Currently, we can only get a non-0 src->t.offset if that text
@@ -10503,9 +10506,18 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
                     }
                 }
                 // Generic text node case: we found the src that came from our node
-                srcIndex = i;
-                srcLen = isObject ? 0 : src->t.len;
-                break;
+                if ( is_first_line ) {
+                    firstLineSrcIndex = i;
+                    // srcLen should be valid for both srcIndex
+                    // Don't break, we want to find the non-first-line srcIndex
+                }
+                else {
+                    srcIndex = i;
+                    if ( firstLineSrcIndex >= 0)
+                        laterLineSrcIndex = i;
+                    srcLen = isObject ? 0 : src->t.len;
+                    break;
+                }
             }
             lastIndex = i;
             lastLen =  isObject ? 0 : src->t.len;
@@ -10534,6 +10546,12 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
         bool hasBestBidiRect = false;
 
         for ( int l = 0; l<txtform->GetLineCount(); l++ ) {
+            if ( firstLineSrcIndex >= 0) {
+                if ( l == 0 )
+                    srcIndex = firstLineSrcIndex;
+                else if ( laterLineSrcIndex >= 0 )
+                    srcIndex = laterLineSrcIndex;
+            }
             const formatted_line_t * frmline = txtform->GetLineInfo(l);
             bool line_is_bidi = frmline->flags & LTEXT_LINE_IS_BIDI;
             bool para_is_rtl = frmline->flags & LTEXT_LINE_PARA_IS_RTL;
@@ -10847,7 +10865,7 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
                         LVFont *font = (LVFont *) txtform->GetSrcInfo(srcIndex)->t.font;
                         lUInt16 w[512];
                         lUInt8 flg[512];
-                        lString32 str = node->getText();
+                        lString32 str = node->getEffectiveText();
                         // With "|| (extended && offset < word->t.start)" added to the first if
                         // above, we may now be here with: offset = word->t.start = 0
                         // and a node->getText() returning THE lString32::empty_str:
