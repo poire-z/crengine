@@ -29,6 +29,14 @@
 //=====================================================
 XS_BEGIN_TAGS
 
+// Internal element created for ::first-line DOM cloning:
+//  - clones of source elements/text inside pseudoElem[FirstLine]
+//  - inherits display and white-space from its CloneType
+//  - stores reference to original node for CSS matching
+// Keep this one first (so its enum value is 1 and we can use it hardcoded
+// in ldomNode::*Effective* methods in lvtinydom.h and allow inlining)
+XS_TAG1D( cloneNode, false, css_d_none, css_ws_inherit )
+
 // Boxing elements (inserted in the DOM tree between original parent and children):
 //
 // Internal element for block wrapping inline elements (without a proper parent
@@ -54,12 +62,6 @@ XS_TAG1I( inlineBox )
 //    its style->content when rendering and drawing text.
 // It does not box anything and has no child, so it's not considered a boxing node.
 XS_TAG1D( pseudoElem, false, css_d_none, css_ws_inherit )
-
-// Internal element created for ::first-line DOM cloning:
-//  - clones of source elements/text inside pseudoElem[FirstLine]
-//  - inherits display and white-space from its CloneType
-//  - stores reference to original node for CSS matching
-XS_TAG1D( cloneNode, false, css_d_none, css_ws_inherit )
 
 // Internal element for EPUB, containing each individual HTML file
 XS_TAG1( DocFragment )

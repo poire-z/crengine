@@ -6198,7 +6198,6 @@ void ldomElementWriter::onBodyEnter()
                         // this node.
                         _pseudoElementAfterChildIndex = i;
                     }
-
                 }
             }
         }

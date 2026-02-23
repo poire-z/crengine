@@ -3272,40 +3272,13 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                        lString32 running_bidi_ctrlchars )
 {
     bool legacy_rendering = !BLOCK_RENDERING_N(enode, ENHANCED);
-    
-    // Early check for cloneNode text elements to route them to text handling
-    bool isCloneText = enode->isElement() && enode->getNodeId() == el_cloneNode && enode->hasAttribute(attr_T);
-    
-    if ( enode->isElement() && !isCloneText ) {
-        lUInt16 nodeElementId = enode->getNodeId();
-        ldomNode * originalForAttrs = NULL;
-        
-        // For cloneNode elements that represent element nodes (not text):
-        // Process them mostly normally, but use the original node for attribute checks
-        // and element ID, while using the clone's own style (inherited from ::first-line).
-        if ( nodeElementId == el_cloneNode ) {
-            originalForAttrs = enode->getCloneNodeSource();
-            if ( originalForAttrs && originalForAttrs->isElement() ) {
-                // Use original's element ID for checks below
-                nodeElementId = originalForAttrs->getNodeId();
-            }
-            else {
-                // Invalid cloneNode
-                return;
-            }
-        }
-        lvdom_element_render_method rm = enode->getRendMethod();
+    if ( enode->isEffectiveElement() ) {
+        lvdom_element_render_method rm = enode->getRendMethod(); // XXX Effective?
         if ( rm == erm_invisible )
             return; // don't draw invisible
 
-        if ( enode->hasAttribute( attr_lang ) ) {
-            lString32 lang_tag = enode->getAttributeValue( attr_lang );
-            if ( !lang_tag.empty() )
-                lang_cfg = TextLangMan::getTextLangCfg( lang_tag );
-        }
-        // For cloneNode elements, also check attributes on original node
-        if ( originalForAttrs && originalForAttrs->hasAttribute( attr_lang ) ) {
-            lString32 lang_tag = originalForAttrs->getAttributeValue( attr_lang );
+        if ( enode->hasEffectiveAttribute( attr_lang ) ) {
+            lString32 lang_tag = enode->getEffectiveAttributeValue( attr_lang );
             if ( !lang_tag.empty() )
                 lang_cfg = TextLangMan::getTextLangCfg( lang_tag );
         }
@@ -3327,7 +3300,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
 
         css_style_ref_t style = enode->getStyle();
 
-        bool is_object = enode->isImage();
+        bool is_object = enode->isEffectiveImage();
         // inline-block boxes are handled below quite just like inline images/is_object
         bool is_inline_box = enode->isBoxingInlineBox();
 
@@ -4094,12 +4067,11 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // Usual elements
 
             // Some elements add some generated content
-            lUInt16 nodeElementId = enode->getNodeId();
+            lUInt16 nodeElementId = enode->getEffectiveNodeId();
             // Don't handle dir= for the erm_final (<p dir="auto"), as it would "isolate"
             // the whole content from the bidi algorithm and we would get a default paragraph
             // direction of LTR. It is handled directly in lvtextfm.cpp.
-            bool hasDirAttribute = rm != erm_final && (enode->hasAttribute( attr_dir ) || 
-                                                         (originalForAttrs && originalForAttrs->hasAttribute( attr_dir )));
+            bool hasDirAttribute = rm != erm_final && enode->hasEffectiveAttribute( attr_dir );
             bool addGeneratedContent = hasDirAttribute ||
                                        nodeElementId == el_bdi ||
                                        nodeElementId == el_bdo ||
@@ -4124,7 +4096,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 // When meeting them, we add the equivalent unicode opening and closing chars so
                 // that fribidi (working on text only) can ensure what's specified with HTML tags.
                 // See http://unicode.org/reports/tr9/#Markup_And_Formatting
-                lString32 dir = enode->getAttributeValueLC( attr_dir );
+                lString32 dir = enode->getEffectiveAttributeValueLC( attr_dir );
                 if ( nodeElementId == el_bdo ) {
                     // <bdo> (bidirectional override): prevents the bidirectional algorithm from
                     //       rearranging the sequence of characters it encloses
@@ -4216,7 +4188,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 // BiDi stuff had to be outputed first, before any pseudo element
                 // (if <q dir="rtl">...</q>, the added quote (first child pseudo element)
                 // should be inside the RTL bidi isolation.
-                if ( nodeElementId == el_pseudoElem && (enode->hasAttribute(attr_Before) || enode->hasAttribute(attr_After)) ) {
+                if ( nodeElementId == el_pseudoElem && (enode->hasEffectiveAttribute(attr_Before) || enode->hasEffectiveAttribute(attr_After)) ) {
                     lString32 content = get_applied_content_property(enode);
                     if ( !content.empty() ) {
                         switch (style->text_transform) {
@@ -4233,12 +4205,12 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                         flags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
                     }
                 }
-                if ( nodeElementId == el_pseudoElem && enode->hasAttribute(attr_FirstLetter) ) {
+                if ( nodeElementId == el_pseudoElem && enode->hasEffectiveAttribute(attr_FirstLetter) ) {
                     // Skip rendering if display:none
                     if ( style->display != css_d_none ) {
-                        int firstLetterEnd = enode->getAttributeValue(attr_FirstLetter).atoi();
+                        int firstLetterEnd = enode->getEffectiveAttributeValue(attr_FirstLetter).atoi();
                         // Find the next sibling text node
-                        ldomNode * textNode = enode->getFirstLetterTextNode();
+                        ldomNode * textNode = enode->getFirstLetterTextNode(); // XXX Effective
                         if ( textNode && firstLetterEnd > 0 ) {
                             lString32 txt = textNode->getText();
                             if ( txt.length() >= firstLetterEnd ) {
@@ -4359,7 +4331,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
         else { // newline consumed
             baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
         }
-        if ( enode->getNodeId()==el_br ) {
+        if ( enode->getEffectiveNodeId()==el_br ) {
             if (baseflags & LTEXT_FLAG_NEWLINE) {
                 // We meet a <BR/>, but no text node were met before (or it
                 // would have cleared the newline flag).
@@ -4448,23 +4420,13 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                             baseflags | LTEXT_SRC_IS_CLEAR_LAST | LTEXT_FLAG_PREFORMATTED | LTEXT_FLAG_OWNTEXT,
                             line_h, valign_dy, 0, enode);
         }
-    }
-    else if ( enode->isText() || isCloneText ) {
-        // text nodes (or cloneNode elements representing text nodes)
-        ldomNode * textSourceNode = enode;
-        
-        // For cloneNode text elements, get the original text node
-        if ( isCloneText ) {
-            if ( enode->getRendMethod() == erm_invisible ) {
-                return; // don't draw invisible
-            }
-            textSourceNode = enode->getCloneNodeSource();
-            if ( !textSourceNode || !textSourceNode->isText() ) {
-                return; // Invalid cloneNode
-            }
+        if ( is_pseudoElem_FirstLine ) { // XXX not needed
+            flags &= ~LTEXT_IS_FIRST_LINE_CLONE|~LTEXT_IS_FIRST_LINE_ENOUGH;
         }
-        
-        lString32 txt = textSourceNode->getText();
+    }
+    else if ( enode->isEffectiveText() ) {
+        // text nodes
+        lString32 txt = enode->getEffectiveText();
         if ( !txt.empty() ) {
             #ifdef DEBUG_DUMP_ENABLED
                 for (int i=0; i<enode->getNodeLevel(); i++)
@@ -4553,7 +4515,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // If this text node has a preceding ::first-letter pseudo element,
             // we should skip adding the leading text rendered by that pseudoElem
             int textOffset = 0;
-            textSourceNode->getFirstLetterPseudoElem(&textOffset);
+            enode->getFirstLetterPseudoElem(&textOffset);
             // Just below, if it happens that txt.length()=textOffset (single letter
             // text node that got to be a first-letter, with no remaining text),
             // we will let an empty text source be added. An empty text node seems
@@ -4562,7 +4524,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
 
             if ( txt.length() > 0 ) {
                 txform->AddSourceLine( txt.c_str(), txt.length(), cl, bgcl, font.get(), lang_cfg, baseflags | tflags,
-                    line_h, valign_dy, indent, textSourceNode, textOffset, letter_spacing );
+                    line_h, valign_dy, indent, enode, textOffset, letter_spacing );
                 baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
                 // To show the lang tag for the lang used for this text node AFTER it:
                 // lString32 lang_tag_txt = U"[" + (lang_cfg ? lang_cfg->getLangTag() : lString32("??")) + U"]";
@@ -11677,12 +11639,9 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         printf("GRW node: %s\n", UnicodeToLocal(ldomXPointer(node, 0).toString()).c_str());
     #endif
 
-    // Early check for cloneNode text elements to route them to text handling
-    bool isCloneText = node->isElement() && node->getNodeId() == el_cloneNode && node->hasAttribute(attr_T);
-    // XXX get attributes from original node
-
-    if ( node->isElement() && !isCloneText && !processNodeAsText ) {
-        lUInt16 nodeElementId = node->getNodeId();
+    if ( node->isEffectiveElement() && !processNodeAsText ) {
+        // XXX More *Effective* to use
+        lUInt16 nodeElementId = node->getEffectiveNodeId();
         int m = node->getRendMethod();
         if (m == erm_invisible)
             return;
@@ -12413,14 +12372,8 @@ void getRenderedWidths(ldomNode * node, int &maxWidth, int &minWidth, int direct
         int start = 0;
         int len = 0;
         ldomNode * parent;
-        if ( node->isText() || isCloneText ) {
-            if ( isCloneText ) {
-                ldomNode * textSourceNode = node->getCloneNodeSource();
-                text = textSourceNode->getText();
-            }
-            else {
-                text = node->getText();
-            }
+        if ( node->isEffectiveText() ) {
+            text = node->getEffectiveText();
             len = text.length();
             parent = node->getParentNode();
             // Check if this text node has a preceding FirstLetter pseudoElem
