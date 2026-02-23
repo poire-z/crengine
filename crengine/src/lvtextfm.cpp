@@ -4722,6 +4722,8 @@ public:
         // split paragraph into lines, export lines
         int pos = 0;
 
+        bool is_css_first_line = m_srcs[0]->flags & LTEXT_IS_FIRST_LINE_CLONE;
+
         #if (USE_LIBUNIBREAK!=1)
         int upSkipPos = -1;
         #endif
@@ -4795,6 +4797,13 @@ public:
             for ( i=pos; i<m_length; i++ ) {
                 if ( m_text[i]=='\n' ) { // might happen in <pre>formatted only (?)
                     lastMandatoryWrap = i;
+                    break;
+                }
+                if ( is_css_first_line && !(m_srcs[i]->flags & LTEXT_IS_FIRST_LINE_CLONE) ) {
+                    // We reached the non-first-line sequence: the first-line sequence
+                    // did fit all on the first line, don't go at appending the same
+                    // text from the non-first line sequence
+                    lastMandatoryWrap = i-1; // -1 so we start on i
                     break;
                 }
                 lUInt16 flags = m_flags[i];
@@ -5307,6 +5316,22 @@ public:
             #endif
             if (endp > m_length)
                 endp = m_length;
+
+            // if (pos == 0 && m_srcs[pos]->flags & LTEXT_IS_FIRST_LINE_CLONE) {
+            if ( is_css_first_line ) {
+                is_css_first_line = false;
+                // We had a copy of the source text with CSS first-line styling.
+                // Fast forward to the start of the non-first-line stream
+                int i = wrapPos;
+                while (i < m_length && m_srcs[i]->flags & LTEXT_IS_FIRST_LINE_CLONE)
+                    i++;
+                // Move in the non-first-line as much as we used in the first-line stream
+                i += wrapPos;
+                printf("first line done, moving from %d to %d\n", endp, i);
+                wrapPos = i;
+                if (wrapPos >= m_length)
+                    wrapPos = m_length-1;
+            }
 
             // Best position to end this line found.
             bool hasInlineBoxes = firstInlineBoxPos >= 0 && firstInlineBoxPos < endp;

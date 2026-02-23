@@ -3271,6 +3271,13 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                        int indent, int line_h, TextLangCfg * lang_cfg, int valign_dy, bool * is_link_start,
                        lString32 running_bidi_ctrlchars )
 {
+    // In here, we use the *Effective* variants of most enode methods (but not getStyle())
+    // to handle clonedNode involved in the rendering of ::first-line
+
+    if ( baseflags & LTEXT_IS_FIRST_LINE_ENOUGH ) {
+        return; // enough first-line content (we have met a <br/>)
+    }
+
     bool legacy_rendering = !BLOCK_RENDERING_N(enode, ENHANCED);
     if ( enode->isEffectiveElement() ) {
         lvdom_element_render_method rm = enode->getRendMethod(); // XXX Effective?
@@ -3358,6 +3365,13 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
         // - flags is provided to this node's children (all inline) (becoming baseflags
         //   for them), and should carry inherited text decoration, vertical alignment
         //   and whitespace-pre state.
+
+        // XXX comment
+        bool is_pseudoElem_FirstLine = enode->getNodeId() == el_pseudoElem && enode->hasAttribute(attr_FirstLine);
+        if ( is_pseudoElem_FirstLine ) {
+            flags |= LTEXT_IS_FIRST_LINE_CLONE;
+            // XXX When we meet a BR, we could stop adding stuff until we're out of this pseudoElem
+        }
 
         int width = fmt->getWidth();
         const int em = enode->getFont()->getSize();
@@ -4332,6 +4346,13 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
         }
         if ( enode->getEffectiveNodeId()==el_br ) {
+            if ( flags & LTEXT_IS_FIRST_LINE_CLONE ) {
+                // We meet a <br/> while emiting the text with the CSS ::first-line style,
+                // we don't need to emit any followup text with that style, as the first-line
+                // will be done.
+                baseflags |= LTEXT_IS_FIRST_LINE_ENOUGH;
+                return;
+            }
             if (baseflags & LTEXT_FLAG_NEWLINE) {
                 // We meet a <BR/>, but no text node were met before (or it
                 // would have cleared the newline flag).
@@ -10896,18 +10917,6 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // made visible when some book stylesheet contains "body > * {display: block;}")
     if (nodeElementId == el_stylesheet) {
         pstyle->display = css_d_none;
-    }
-
-    // For ::first-line pseudoElem, force display: inline-block and width: 100%
-    // This makes it a block-level inline box that takes full width, allowing
-    // it to be formatted independently and stopped after the first line.
-    if (nodeElementId == el_pseudoElem && enode->hasAttribute(attr_FirstLine)) {
-        pstyle->display = css_d_inline_block;
-        pstyle->width.type = css_val_percent;
-        pstyle->width.value = 100 * 256; // 100% in fixed point (256 = 1.0)
-        // XXX somehow, the first line is shown again if we don't use 100 % ?!!
-        // XXX not a real issue, but I'd like to undestand why !
-        // pstyle->width.value = 90 * 256; // XXX
     }
 
     if ( BLOCK_RENDERING(rend_flags, PREPARE_FLOATBOXES) ) {
