@@ -807,9 +807,6 @@ public:
     void getInvolvedFloatIds( int & float_count, lUInt32 * float_ids );
     void setInvolvedFloatIds( int float_count, lUInt32 * float_ids );
 
-    int  getAfterFirstLineRestartOffset();
-    void setAfterFirstLineRestartOffset( int offset );
-
     void push();
     void clear();
     RenderRectAccessor( ldomNode * node );
