@@ -6239,15 +6239,29 @@ void ldomNode::ensurePseudoElement( bool is_before ) {
     int insertChildIndex = -1;
     int nb_children = getChildCount();
     if ( is_before ) { // ::before
-        insertChildIndex = 0; // always to be inserted first, if not already there
+        // ::before should be at position 0, or at position 1 if FirstLine is at position 0.
+        insertChildIndex = 0; // default: insert first
         if ( nb_children > 0 ) {
-            ldomNode * child = getChildNode(0); // should always be found as the first node
+            ldomNode * child = getChildNode(0);
             // pseudoElem might have been wrapped by a inlineBox, autoBoxing, floatBox...
             while ( child && child->isBoxingNode() && child->getChildCount()>0 )
                 child = child->getChildNode(0);
             if ( child && child->getNodeId() == el_pseudoElem && child->hasAttribute(attr_Before) ) {
-                // Already there, no need to create it
+                // Already there at position 0, no need to create it
                 insertChildIndex = -1;
+            }
+            else if ( child && child->getNodeId() == el_pseudoElem && child->hasAttribute(attr_FirstLine) ) {
+                // FirstLine is at position 0; ::before belongs at position 1
+                insertChildIndex = 1;
+                if ( nb_children > 1 ) {
+                    ldomNode * child1 = getChildNode(1);
+                    while ( child1 && child1->isBoxingNode() && child1->getChildCount()>0 )
+                        child1 = child1->getChildNode(0);
+                    if ( child1 && child1->getNodeId() == el_pseudoElem && child1->hasAttribute(attr_Before) ) {
+                        // Already there at position 1, no need to create it
+                        insertChildIndex = -1;
+                    }
+                }
             }
         }
     }
@@ -6600,9 +6614,10 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         // This will be done via CSS or in initNodeStyle
     }
     
-    // Only clone children if the pseudoElem doesn't already have cloneNodes
-    // This keeps the DOM stable across multiple ensureFirstLine() calls
-    if ( firstLineElem->getChildCount() == 0 ) {
+    // Only clone children if requested (initStyle=true means we're in onBodyExit,
+    // where all real children exist) and if the pseudoElem has no cloneNodes yet.
+    // This keeps the DOM stable across multiple ensureFirstLine() calls.
+    if ( initStyle && firstLineElem->getChildCount() == 0 ) {
         // Clone all children of this element into firstLineElem
         // Skip the first child (i=1) since it's the firstLineElem itself (possibly boxed)
         for ( int i = 1; i < (int)getChildCount(); i++ ) {
