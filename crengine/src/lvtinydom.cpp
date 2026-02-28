@@ -6325,6 +6325,11 @@ void ldomNode::ensureFirstLetter(bool initStyle) {
     //   - true: call initNodeStyle() on newly created pseudoElem (during DOM building from onBodyExit)
     //   - false: skip initNodeStyle() as it will be called during recursive style pass (during stylesheet re-application)
 
+    // Do nothing on a cloneNode, this will have been done on its source
+    if ( getNodeId() == el_cloneNode ) {
+        return;
+    }
+
     // First, ensure the HasFirstLetter attribute is set
     if ( !hasAttribute(attr_HasFirstLetter) ) {
         setAttributeValue(LXML_NS_NONE, attr_HasFirstLetter, U"");
@@ -6544,8 +6549,8 @@ static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
             ldomNode * childSource = source->getChildNode(i);
             // Skip pseudoElem nodes (::before, ::after, ::first-line, ::first-letter)
             // to avoid infinite recursion when cloning
-            if ( childSource->isElement() && childSource->getNodeId() == el_pseudoElem )
-                continue;
+//            if ( childSource->isElement() && childSource->getNodeId() == el_pseudoElem )
+//                continue;
             cloneNodeRecursively(childSource, clone);
         }
     }
@@ -10500,7 +10505,7 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
                     // could use: srcIndex=i-1 , but this does not handle all
                     // cases, especially when the first-letter is a float.)
                     // So, find the pseudoElem that carries that first-letter
-                    ldomNode * pseudoElem = node->getFirstLetterPseudoElem();
+                    ldomNode * pseudoElem = node->getEffectiveFirstLetterPseudoElem();
                     if ( pseudoElem ) {
                         // Call us again on that pseudoElem with the same offset as provided
                         ldomXPointer xpFirstLetter(pseudoElem, offset);
@@ -10518,6 +10523,11 @@ bool ldomXPointer::getRect(lvRect & rect, bool extended, bool adjusted, int * ct
                     ldomNode * textNode = node->getFirstLetterTextNode();
                     if ( textNode ) {
                         node = textNode;
+                        srcIndex = i;
+                        srcLen = isObject ? 0 : src->t.len;
+                        // If we were on a ::first-line, we did resolve the cloneNode to its pseudoElem,
+                        // no need for the first/later LineSrcIndex gathering below.
+                        break;
                     }
                 }
                 // Generic text node case: we found the src that came from our node

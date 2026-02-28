@@ -4793,6 +4793,7 @@ public:
             // Find candidates where end of line is possible
             bool seen_non_collapsed_space = false;
             bool seen_first_rendered_char = false;
+            bool first_line_sequance_end_reached = false; // ::first-line cloned text end reached
             int i;
             for ( i=pos; i<m_length; i++ ) {
                 if ( m_text[i]=='\n' ) { // might happen in <pre>formatted only (?)
@@ -4803,7 +4804,10 @@ public:
                     // We reached the non-first-line sequence: the first-line sequence
                     // did fit all on the first line, don't go at appending the same
                     // text from the non-first line sequence
-                    lastMandatoryWrap = i-1; // -1 so we start on i
+                    first_line_sequance_end_reached = true;
+                    // For the followup wrap position resolution, pretend we met a \n
+                    // after where first line sequence end
+                    lastMandatoryWrap = i;
                     break;
                 }
                 lUInt16 flags = m_flags[i];
@@ -5317,20 +5321,37 @@ public:
             if (endp > m_length)
                 endp = m_length;
 
-            // if (pos == 0 && m_srcs[pos]->flags & LTEXT_IS_FIRST_LINE_CLONE) {
             if ( is_css_first_line ) {
                 is_css_first_line = false;
-                // We had a copy of the source text with CSS first-line styling.
-                // Fast forward to the start of the non-first-line stream
-                int i = wrapPos;
-                while (i < m_length && m_srcs[i]->flags & LTEXT_IS_FIRST_LINE_CLONE)
-                    i++;
-                // Move in the non-first-line as much as we used in the first-line stream
-                i += wrapPos;
-                printf("first line done, moving from %d to %d\n", endp, i);
-                wrapPos = i;
-                if (wrapPos >= m_length)
+                if ( first_line_sequance_end_reached ) {
+                    // We're done: let us be exiting this loop properly
                     wrapPos = m_length-1;
+                }
+                else {
+                    // We had a copy of the source text with CSS first-line styling,
+                    // and we did not meet its end. We should fast forward skipping
+                    // that first-line sequence, and once in the normal text sequence
+                    // (which include the the full text since the start of the paragraph)
+                    // skip the part that has just been output as first-line.
+                    // Skip from here until non-first-line-clone
+                    int i = wrapPos;
+                    while (i < m_length && m_srcs[i]->flags & LTEXT_IS_FIRST_LINE_CLONE)
+                        i++;
+                    // We assume we got the same text content in the first-line sequence
+                    // as in the normal text copy we get after it.
+                    // (If this happens to not be true, the alternative is to get the node from
+                    // the srcline we stopped on (it is a cloneNode), get from it the node which
+                    // was the original source, and iterate to find the srcline having that node,
+                    // and skip the offset of it we had in the cloned source. With the risk
+                    // of not finding it if some generated content was there.) XXX see if needed
+                    // Move in the non-first-line as much as we walked until wrap in the first-line stream
+                    i += wrapPos;
+                    // And use that as wrapPos for what follows.
+                    wrapPos = i;
+                    if (wrapPos >= m_length)
+                        wrapPos = m_length-1;
+                    printf("first line done, moving from %d to %d\n", endp, i);
+                }
             }
 
             // Best position to end this line found.

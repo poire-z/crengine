@@ -6356,6 +6356,7 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
         // Check the selector against the original node
         // This is more efficient as it checks the actual element and its ancestors
         return check(originalNode, allow_cache);
+        // XXX could fall through
     }
     else if ( nodeId == el_pseudoElem ) {
         if ( !_pseudo_elem ) { // not a ::before/after/first-letter/first-line rule
@@ -7014,6 +7015,9 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
     // not apply to the style of this node), and on the actual pseudo element
     // once it has been created as a child (to which we should apply).
     css_style_rec_t * target_style = NULL;
+    if ( node->getNodeId() == el_cloneNode ) {
+        node = node->getCloneNodeSource();
+    }
     if ( node->getNodeId() == el_pseudoElem ) {
         if (    ( _pseudo_elem == csspe_before && node->hasAttribute(attr_Before) )
              || ( _pseudo_elem == csspe_after  && node->hasAttribute(attr_After)  )
@@ -7156,7 +7160,8 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
         id = originalNode->getNodeId();
         // Continue with selector matching using original's id, but apply to cloneNode
     }
-    else if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
+//    else if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
+    if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
         // Note that a "div:before {float:left}" will result in: <div><floatBox><pseudoElem>
         if ( node->hasAttribute(attr_FirstLetter) ) {
             // For ::first-letter, find the ancestor with HasFirstLetter attribute

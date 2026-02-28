@@ -1540,7 +1540,7 @@ public:
                             const src_text_fragment_t * src = txform->GetSrcInfo( line->words[w].src_text_index );
                             if ( src && src->object ) {
                                 ldomNode * node = (ldomNode*)src->object;
-                                ldomNode * parent = node->getParentNode();
+                                ldomNode * parent = node->getEffectiveNode()->getParentNode();
                                 while (parent && parent->getNodeId() != el_a)
                                     parent = parent->getParentNode();
                                 if ( parent && parent->hasAttribute(LXML_NS_ANY, attr_href)
@@ -1757,7 +1757,7 @@ public:
                                         const src_text_fragment_t * src = txform->GetSrcInfo( line->words[w].src_text_index );
                                         if ( src && src->object ) {
                                             ldomNode * node = (ldomNode*)src->object;
-                                            ldomNode * parent = node->getParentNode();
+                                            ldomNode * parent = node->getEffectiveNode()->getParentNode();
                                             while (parent && parent->getNodeId() != el_a)
                                                 parent = parent->getParentNode();
                                             if ( parent && parent->hasAttribute(LXML_NS_ANY, attr_href)
@@ -2441,22 +2441,23 @@ LVFontRef getFont(ldomNode * node, css_style_rec_t * style, int documentId)
     return fnt;
 }
 
-inline lUInt32 getBackgroundColor(const css_style_ref_t style)
+inline lUInt32 getBackgroundColor(const css_style_ref_t style, lUInt32 parentBackgroundColor)
 {
         if ( style->background_color.type == css_val_color ) {
             if ( IS_COLOR_FULLY_TRANSPARENT(style->background_color.value) ) {
-                return LTEXT_COLOR_CURRENT; // keep using current background color
+                // If "transparent", we somehow ensure its inheritance from the parent
+                return parentBackgroundColor;
             }
             return LTEXT_COLOR_IS_RESERVED(style->background_color.value) ? LTEXT_COLOR_RESERVED_REPLACE : style->background_color.value;
         }
         // Othewise, it is (css_val_unspecified, css_generic_currentcolor), and we must use the font color.
         if ( style->color.type == css_val_color ) { // should always be true
             if ( IS_COLOR_FULLY_TRANSPARENT(style->color.value) ) {
-                return LTEXT_COLOR_CURRENT; // keep using current background color
+                return parentBackgroundColor;
             }
             return LTEXT_COLOR_IS_RESERVED(style->color.value) ? LTEXT_COLOR_RESERVED_REPLACE : style->color.value;
         }
-        return LTEXT_COLOR_CURRENT;
+        return parentBackgroundColor;
 }
 
 inline lUInt32 getForegroundColor(const css_style_ref_t style)
@@ -3268,8 +3269,8 @@ bool renderAsListStylePositionInside( const css_style_ref_t style, bool is_rtl=f
 // the container, which is only needed to compute indent (text-indent) values in %,
 // and to get paragraph direction (LTR/RTL/UNSET).
 void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAccessor * fmt, lUInt32 & baseflags,
-                       int indent, int line_h, TextLangCfg * lang_cfg, int valign_dy, bool * is_link_start,
-                       lString32 running_bidi_ctrlchars )
+                       int indent, int line_h, TextLangCfg * lang_cfg, lUInt32 bgcolor, int valign_dy,
+                       bool * is_link_start, lString32 running_bidi_ctrlchars )
 {
     // In here, we use the *Effective* variants of most enode methods (but not getStyle())
     // to handle clonedNode involved in the rendering of ::first-line
@@ -3366,11 +3367,27 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
         //   for them), and should carry inherited text decoration, vertical alignment
         //   and whitespace-pre state.
 
-        // XXX comment
+        // About background-color:
+        // If erm_final, the background will be drawn by DrawDocument, and should not
+        // be drawn by the LFormattedText txform.
+        // Inline nodes' background color (CSS initial value is 'transparent') can specify
+        // a background-color, that will be passed to txform->AddSourceLine() to be drawn
+        // (if non-transparent) by lvtextfm->Draw().
+        // If some upper inline node has set a background color, it should be passed to,
+        // to be drawn by, children inline nodes (we somehow ensure inheritance of it
+        // among inline nodes, as CSS specs makes it non-inheritable).
+        lUInt32 bgcl = rm == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style, bgcolor);
+
+        // A <pseudoElem FirstLine> will contain only <cloneNode>s: they will each carry the
+        // style and font as styled by the ::first-line style. But for everything else (text,
+        // attributes), we will need to fetch them from the cloneNode's source, so the use
+        // of the isEffective/getEffective* variants of many ldomNode methods above and below.
+        // We flag the fragments we will add from these cloneNodes with LTEXT_IS_FIRST_LINE_CLONE,
+        // so the lvtextfm.cpp can skip the sequence when it is done adding the first line,
+        // and resume from the normal text sequence.
         bool is_pseudoElem_FirstLine = enode->getNodeId() == el_pseudoElem && enode->hasAttribute(attr_FirstLine);
         if ( is_pseudoElem_FirstLine ) {
             flags |= LTEXT_IS_FIRST_LINE_CLONE;
-            // XXX When we meet a BR, we could stop adding stuff until we're out of this pseudoElem
         }
 
         int width = fmt->getWidth();
@@ -3849,7 +3866,6 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 css_list_style_position_t sp = style->list_style_position;
                 LVFontRef font = enode->getFont();
                 lUInt32 cl = getForegroundColor(style);
-                lUInt32 bgcl = getBackgroundColor(style);
                 int margin = 0;
                 if ( sp >= css_lsp_outside )
                     margin = -marker_width; // will ensure negative/hanging indent-like rendering
@@ -3959,7 +3975,6 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                     // as done below with standalone block images.
                     LVFontRef font = enode->getFont();
                     lUInt32 cl = getForegroundColor(style);
-                    lUInt32 bgcl = LTEXT_COLOR_CURRENT; // erm_final: any background will be drawn by DrawDocument
                     if ( !suptitle.empty() ) {
                         lString32Collection lines;
                         lines.parse(suptitle, cs32("\\n"), true);
@@ -4100,9 +4115,6 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 // char before, this other char would generate a new line.
                 LVFontRef font = enode->getFont();
                 lUInt32 cl = getForegroundColor(style);
-                // If erm_final, the background will be drawn by DrawDocument, and should not
-                // be drawn by the LFormattedText txform
-                lUInt32 bgcl = rm == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
 
                 // The following is needed for fribidi to do the right thing when the content creator
                 // has provided hints to explicite ambiguous cases.
@@ -4203,7 +4215,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 // (if <q dir="rtl">...</q>, the added quote (first child pseudo element)
                 // should be inside the RTL bidi isolation.
                 if ( nodeElementId == el_pseudoElem && (enode->hasEffectiveAttribute(attr_Before) || enode->hasEffectiveAttribute(attr_After)) ) {
-                    lString32 content = get_applied_content_property(enode);
+                    lString32 content = get_applied_content_property(enode->getEffectiveNode());
                     if ( !content.empty() ) {
                         switch (style->text_transform) {
                             case css_tt_uppercase: content.uppercase(); break;
@@ -4224,7 +4236,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                     if ( style->display != css_d_none ) {
                         int firstLetterEnd = enode->getEffectiveAttributeValue(attr_FirstLetter).atoi();
                         // Find the next sibling text node
-                        ldomNode * textNode = enode->getFirstLetterTextNode(); // XXX Effective
+                        ldomNode * textNode = enode->getEffectiveFirstLetterTextNode();
                         if ( textNode && firstLetterEnd > 0 ) {
                             lString32 txt = textNode->getText();
                             if ( txt.length() >= firstLetterEnd ) {
@@ -4259,13 +4271,12 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             for (int i=0; i<cnt; i++)
             {
                 ldomNode * child = enode->getChildNode( i );
-                renderFinalBlock( child, txform, fmt, flags, indent, line_h, lang_cfg, valign_dy, is_link_start_p, running_bidi_ctrlchars );
+                renderFinalBlock( child, txform, fmt, flags, indent, line_h, lang_cfg, bgcl, valign_dy, is_link_start_p, running_bidi_ctrlchars );
             }
 
             if ( addGeneratedContent ) {
                 LVFontRef font = enode->getFont();
                 lUInt32 cl = getForegroundColor(style);
-                lUInt32 bgcl = rm == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
                 // See comment above: these are the closing counterpart
                 if ( closeWithPDI ) {
                     txform->AddSourceLine( U"\x2069", 1, cl, bgcl, font.get(), lang_cfg, flags|LTEXT_FLAG_OWNTEXT, line_h, valign_dy, indent, enode);
@@ -4298,7 +4309,6 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 LVFontRef font = enode->getFont();
                 css_style_ref_t style = enode->getStyle();
                 lUInt32 cl = getForegroundColor(style);
-                lUInt32 bgcl = rm == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
                 txform->AddSourceLine( U" ", 1, cl, bgcl, font.get(), lang_cfg, LTEXT_LOCKED_SPACING|LTEXT_FLAG_OWNTEXT, line_h, valign_dy, 0, enode);
                 /*
                 // We used to specify two UNICODE_NO_BREAK_SPACE (that would not collapse)
@@ -4361,7 +4371,6 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
                 // (This makes consecutive and stuck <br><br><br> work)
                 LVFontRef font = enode->getFont();
                 lUInt32 cl = getForegroundColor(style);
-                lUInt32 bgcl = rm == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
                 txform->AddSourceLine( U" ", 1, cl, bgcl, font.get(), lang_cfg,
                                         baseflags | LTEXT_FLAG_PREFORMATTED | LTEXT_FLAG_OWNTEXT,
                                         line_h, valign_dy, 0, enode);
@@ -4421,7 +4430,6 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             if ( !running_bidi_ctrlchars.empty() && (baseflags & LTEXT_FLAG_NEWLINE)) {
                 LVFontRef font = enode->getFont();
                 lUInt32 cl = getForegroundColor(style);
-                lUInt32 bgcl = rm == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
                 txform->AddSourceLine( running_bidi_ctrlchars.c_str(), running_bidi_ctrlchars.length(), cl, bgcl, font.get(), lang_cfg, baseflags | LTEXT_FLAG_OWNTEXT,
                     line_h, valign_dy, 0, enode );
                 baseflags &= ~LTEXT_FLAG_NEWLINE & ~LTEXT_SRC_IS_CLEAR_BOTH; // clear newline flag
@@ -4436,14 +4444,12 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // string to text, and just call floatClearText().
             LVFontRef font = enode->getFont();
             lUInt32 cl = getForegroundColor(style);
-            lUInt32 bgcl = LTEXT_COLOR_CURRENT; // erm_final: any background will be drawn by DrawDocument
             txform->AddSourceLine( U" ", 1, cl, bgcl, font.get(), lang_cfg,
                             baseflags | LTEXT_SRC_IS_CLEAR_LAST | LTEXT_FLAG_PREFORMATTED | LTEXT_FLAG_OWNTEXT,
                             line_h, valign_dy, 0, enode);
         }
-        if ( is_pseudoElem_FirstLine ) { // XXX not needed
-            flags &= ~LTEXT_IS_FIRST_LINE_CLONE|~LTEXT_IS_FIRST_LINE_ENOUGH;
-        }
+        // This is not needed as flags is lost when we leave that pseudoElem:
+        // if ( is_pseudoElem_FirstLine ) { flags &= ~LTEXT_IS_FIRST_LINE_CLONE|~LTEXT_IS_FIRST_LINE_ENOUGH; }
     }
     else if ( enode->isEffectiveText() ) {
         // text nodes
@@ -4471,9 +4477,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             css_style_ref_t style = parent->getStyle();
 
             lUInt32 cl = getForegroundColor(style);
-            // If erm_final, the background will be drawn by DrawDocument, and should not
-            // be drawn over each word by the LFormattedText txform
-            lUInt32 bgcl = parent->getRendMethod() == erm_final ? LTEXT_COLOR_CURRENT : getBackgroundColor(style);
+            lUInt32 bgcl = bgcolor; // as provided, from parent node
 
             switch (style->text_transform) {
             case css_tt_uppercase:
@@ -4536,7 +4540,7 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
             // If this text node has a preceding ::first-letter pseudo element,
             // we should skip adding the leading text rendered by that pseudoElem
             int textOffset = 0;
-            enode->getFirstLetterPseudoElem(&textOffset);
+            enode->getEffectiveFirstLetterPseudoElem(&textOffset);
             // Just below, if it happens that txt.length()=textOffset (single letter
             // text node that got to be a first-letter, with no remaining text),
             // we will let an empty text source be added. An empty text node seems
@@ -4555,7 +4559,12 @@ void renderFinalBlock( ldomNode * enode, LFormattedText * txform, RenderRectAcce
         }
     }
     else {
-        crFatalError(142, "Unexpected node type");
+//        crFatalError(142, "Unexpected node type");
+        printf("Unexpected node type %d %s\n", enode->getNodeId(), LCSTR(enode->getAttributeValue(attr_CloneNodeId)));
+        // XXX to fix: if ::first-line set on an outer block element (and not on the erm_final we are dealing with),
+        // we would get multiple erm_final cloned, and it's a mess
+        // We probably should ignore such ::first-line, and only accept those set on erm_final.
+        // The cloning should probably happen in initNodeRendMethod, and no in onBodyExit()
     }
 }
 
@@ -5436,7 +5445,7 @@ int renderBlockElementLegacy( LVRendPageContext & context, ldomNode * enode, int
                                 const src_text_fragment_t * src = txform->GetSrcInfo( line->words[w].src_text_index );
                                 if ( src && src->object ) {
                                     ldomNode * node = (ldomNode*)src->object;
-                                    ldomNode * parent = node->getParentNode();
+                                    ldomNode * parent = node->getEffectiveNode()->getParentNode();
                                     while (parent && parent->getNodeId() != el_a)
                                         parent = parent->getParentNode();
                                     if ( parent && parent->hasAttribute(LXML_NS_ANY, attr_href)
@@ -5472,7 +5481,7 @@ int renderBlockElementLegacy( LVRendPageContext & context, ldomNode * enode, int
                                 const src_text_fragment_t * src = txform->GetSrcInfo( line->words[w].src_text_index );
                                 if ( src && src->object ) {
                                     ldomNode * node = (ldomNode*)src->object;
-                                    ldomNode * parent = node->getParentNode();
+                                    ldomNode * parent = node->getEffectiveNode()->getParentNode();
                                     while (parent && parent->getNodeId() != el_a)
                                         parent = parent->getParentNode();
                                     if ( parent && parent->hasAttribute(LXML_NS_ANY, attr_href)
@@ -9068,7 +9077,7 @@ void renderBlockElementEnhanced( FlowState * flow, ldomNode * enode, int x, int 
                                 }
                                 if ( src && src->object ) {
                                     ldomNode * node = (ldomNode*)src->object;
-                                    ldomNode * parent = node->getParentNode();
+                                    ldomNode * parent = node->getEffectiveNode()->getParentNode();
                                     while (parent && parent->getNodeId() != el_a)
                                         parent = parent->getParentNode();
                                     if ( parent && parent->hasAttribute(LXML_NS_ANY, attr_href)
@@ -10673,8 +10682,11 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     const css_elem_def_props_t * type_ptr = enode->getElementTypePtr();
     bool is_object = enode->isImage();
 
+    // XXX rework this ? See if other use needed
+    bool isClonedNode = false;
     ldomNode * originalNode = enode;
     if ( nodeElementId == el_cloneNode ) {
+        isClonedNode = true;
         originalNode = enode->getCloneNodeSource();
         nodeElementId = originalNode->getNodeId();
         type_ptr = originalNode->getElementTypePtr();

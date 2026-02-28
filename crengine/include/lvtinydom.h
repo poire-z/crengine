@@ -973,6 +973,12 @@ public:
     inline lvdom_element_render_method getEffectiveRendMethod() {
         return (getNodeId() == 1) ? getCloneNodeSource()->getRendMethod() : getRendMethod();
     }
+    inline ldomNode * getEffectiveFirstLetterTextNode() const {
+        return (getNodeId() == 1) ? getCloneNodeSource()->getFirstLetterTextNode() : getFirstLetterTextNode();
+    }
+    inline ldomNode * getEffectiveFirstLetterPseudoElem(int * textOffset=NULL) const {
+        return (getNodeId() == 1) ? getCloneNodeSource()->getFirstLetterPseudoElem(textOffset) : getFirstLetterPseudoElem(textOffset);
+    }
 
 
     /// if stylesheet file name is set, and file is found, set stylesheet to its value
