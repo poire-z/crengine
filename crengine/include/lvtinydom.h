@@ -931,9 +931,9 @@ public:
     /// Find the text node following a FirstLetter pseudoElem, returns NULL if not found
     ldomNode * getFirstLetterTextNode() const;
 
-    // Ensure this node has a ::first-line pseudo element (style carrier), creating it if needed
-    // (initStyle: whether to call initNodeStyle() on newly created pseudoElem)
-    void ensureFirstLine(bool initStyle=false);
+    // Ensure this node has a ::first-line pseudo element with cloned children.
+    // Called from initNodeRendMethod() after all boxing is complete.
+    void ensureFirstLine();
 
     /// Get the original node from a cloneNode element (for ::first-line)
     /// Returns NULL if this is not a cloneNode or if the original node cannot be found

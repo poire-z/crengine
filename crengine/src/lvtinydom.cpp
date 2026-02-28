@@ -6561,6 +6561,24 @@ static ldomNode * cloneNodeRecursively(ldomNode * source, ldomNode * parent) {
 #endif
 }
 
+/// Copy rendMethod from source nodes to cloneNodes recursively.
+/// Each cloneNode gets the rendMethod of its source (original) node.
+static void copyRendMethodFromSources(ldomNode * node) {
+#if BUILD_LITE!=1
+    if ( !node || !node->isElement() )
+        return;
+    if ( node->getNodeId() == el_cloneNode ) {
+        ldomNode * source = node->getCloneNodeSource();
+        if ( source ) {
+            node->setRendMethod( source->getRendMethod() );
+        }
+    }
+    for ( int i = 0; i < node->getChildCount(); i++ ) {
+        copyRendMethodFromSources( node->getChildNode(i) );
+    }
+#endif
+}
+
 ldomNode * ldomNode::getCloneNodeSource() const {
 #if BUILD_LITE!=1
     // Check if this is a cloneNode element
@@ -6589,19 +6607,16 @@ ldomNode * ldomNode::getCloneNodeSource() const {
 #endif
 }
 
-void ldomNode::ensureFirstLine(bool initStyle) {
+void ldomNode::ensureFirstLine() {
 #if BUILD_LITE!=1
     // This method handles ::first-line pseudo element creation by cloning
     // the paragraph's inner DOM subtree into the pseudoElem[FirstLine].
     // The clones naturally inherit from the ::first-line style, solving
     // the measurement/layout issue.
-
-
-
-    // Ensure the HasFirstLine attribute is set on this element
-    if ( !hasAttribute(attr_HasFirstLine) ) {
-        setAttributeValue(LXML_NS_NONE, attr_HasFirstLine, U"");
-    }
+    //
+    // Called at the end of initNodeRendMethod() for erm_final nodes with
+    // attr_HasFirstLine, so all boxing (inlineBox, autoBox, etc.) is already
+    // done and children have their final rendMethods.
 
     // Check if we already have a FirstLine pseudoElem child
     // Use getUnboxedFirstChild to find it even if it's been boxed (e.g., in an inlineBox)
@@ -6614,33 +6629,27 @@ void ldomNode::ensureFirstLine(bool initStyle) {
         // Create the FirstLine pseudo element as the first child of this element.
         firstLineElem = insertChildElement( 0, LXML_NS_NONE, el_pseudoElem );
         firstLineElem->setAttributeValue(LXML_NS_NONE, attr_FirstLine, U"");
-        
-        // Set style to make it an inline-block with 100% width
-        // This will be done via CSS or in initNodeStyle
     }
     
-    // Only clone children if requested (initStyle=true means we're in onBodyExit,
-    // where all real children exist) and if the pseudoElem has no cloneNodes yet.
+    // Clone children if the pseudoElem has no cloneNodes yet.
     // This keeps the DOM stable across multiple ensureFirstLine() calls.
-    if ( initStyle && firstLineElem->getChildCount() == 0 ) {
+    if ( firstLineElem->getChildCount() == 0 ) {
         // Clone all children of this element into firstLineElem
         // Skip the first child (i=1) since it's the firstLineElem itself (possibly boxed)
         for ( int i = 1; i < (int)getChildCount(); i++ ) {
             ldomNode * child = getChildNode(i);
-            // Clone this child into the firstLineElem
             cloneNodeRecursively(child, firstLineElem);
         }
     }
     
-    // Initialize styles and rendering methods for firstLineElem after all children are ready
-    if ( initStyle ) {
-        firstLineElem->initNodeStyleRecursive(NULL); // (no callback)
-        // We have set styles, we can initNodeRendMethod.
-        // initNodeRendMethod() would need some update to either pick the rendmethod from
-        // the source nodes, or properly fetch nodeid, styles, text content from the
-        // source nodes. But this will do for now.
-        firstLineElem->initNodeRendMethodRecursive();
-    }
+    // Initialize styles on the firstLineElem subtree — this will apply
+    // ::first-line CSS rules via the normal style cascade
+    firstLineElem->initNodeStyleRecursive(NULL);
+    
+    // Copy rendMethods from the original (source) nodes to their clones.
+    // Since we're called from initNodeRendMethod() after all boxing is done,
+    // the originals have their final rendMethods.
+    copyRendMethodFromSources(firstLineElem);
 #endif
 }
 
@@ -8808,6 +8817,14 @@ void ldomNode::initNodeRendMethod()
         }
     #endif
 
+    // If this node is erm_final and has ::first-line CSS rules, create the
+    // pseudoElem[FirstLine] and clone the children now that all boxing is done.
+    // Children have their final rendMethods, so clones will reflect the correct
+    // post-boxing DOM structure.
+    if ( getRendMethod() == erm_final && hasAttribute(attr_HasFirstLine) ) {
+        ensureFirstLine();
+    }
+
     persist();
 }
 #endif
@@ -8851,11 +8868,11 @@ void ldomElementWriter::onBodyExit()
         _element->ensureFirstLetter(true); // true = init style during DOM building
     }
 
-    // If this element has the HasFirstLine attribute flag, ensure the ::first-line
-    // style-carrier pseudo element is created as a child (it will be initNodeStyle()d here)
-    if ( _element->hasAttribute(attr_HasFirstLine) ) {
-        _element->ensureFirstLine(true); // true = init style during DOM building
-    }
+    // If this element has the HasFirstLine attribute flag, the ::first-line
+    // pseudo element creation and child cloning is deferred to initNodeRendMethod(),
+    // which runs after all boxing is complete (inlineBox, autoBox, etc.).
+    // We just need to set the attribute here (already done by setNodeStyle), and
+    // initNodeRendMethod() will handle the rest.
 
 //    if ( _element->getStyle().isNull() ) {
 //        lString32 path;

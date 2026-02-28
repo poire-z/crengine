@@ -11597,12 +11597,13 @@ void setNodeStyle( ldomNode * enode, css_style_ref_t parent_style, LVFontRef par
     // Now that this node is fully styled, ensure these pseudo elements
     // are there as children, creating them if needed and possible.
     // Order: FirstLine(0), Before(1), FirstLetter(near first text), After(last).
-    // FirstLine is created first so it ends up at position 0; ensurePseudoElement(before)
-    // is aware of FirstLine at position 0 and places ::before at position 1.
-    // When ensureFirstLine clones children (in onBodyExit via initStyle=true), ::before
-    // and ::first-letter are already in place so they get included in the clones.
+    // FirstLine creation (with cloning) is deferred to initNodeRendMethod(),
+    // after all boxing is complete. Here we just set the attribute flag so
+    // initNodeRendMethod() knows to create the pseudoElem[FirstLine].
     if ( requires_has_first_line_attribute ) {
-        enode->ensureFirstLine(false); // false = skip init style during stylesheet re-application
+        if ( !enode->hasAttribute(attr_HasFirstLine) ) {
+            enode->setAttributeValue(LXML_NS_NONE, attr_HasFirstLine, U"");
+        }
     }
     if ( requires_pseudo_element_before )
         enode->ensurePseudoElement(true);
