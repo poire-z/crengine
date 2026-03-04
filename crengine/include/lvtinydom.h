@@ -942,9 +942,11 @@ public:
     /// These (with *Effective*) are equivalent to the non-Effective methods, which
     /// if called on a cloneNode will return what's asked from its source node.
     /// (hardcoded 1 is el_clonedNode )
-    /// returns true if node is element
     inline ldomNode * getEffectiveNode() {
         return (getNodeId() == 1) ? getCloneNodeSource() : this;
+    }
+    inline ldomNode * getEffectiveParentNode() {
+        return (getNodeId() == 1) ? getCloneNodeSource()->getParentNode() : getParentNode();
     }
     inline bool isEffectiveElement() const {
         return (getNodeId() == 1) ? getCloneNodeSource()->isElement() : isElement();
@@ -978,6 +980,15 @@ public:
     }
     inline ldomNode * getEffectiveFirstLetterPseudoElem(int * textOffset=NULL) const {
         return (getNodeId() == 1) ? getCloneNodeSource()->getFirstLetterPseudoElem(textOffset) : getFirstLetterPseudoElem(textOffset);
+    }
+    inline bool isEffectiveFloatingBox() const {
+        return (getNodeId() == 1) ? getCloneNodeSource()->isFloatingBox() : isFloatingBox();
+    }
+    inline bool isEffectiveBoxingInlineBox() const {
+        return (getNodeId() == 1) ? getCloneNodeSource()->isBoxingInlineBox() : isBoxingInlineBox();
+    }
+    inline bool isEffectiveEmbeddedBlockBoxingInlineBox() const {
+        return (getNodeId() == 1) ? getCloneNodeSource()->isEmbeddedBlockBoxingInlineBox() : isEmbeddedBlockBoxingInlineBox();
     }
 
 

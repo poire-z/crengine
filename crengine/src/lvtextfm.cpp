@@ -325,7 +325,7 @@ int getLTextExtraProperty( src_text_fragment_t * srcline, ltext_extra_t extra_pr
     if ( !srcline->object )
         return 0;
     ldomNode * node = (ldomNode *) srcline->object;
-    if ( node->isText() )
+    if ( node->isEffectiveText() )
         node = node->getParentNode();
     if ( !node || node->isNull() )
         return 0;
@@ -4806,7 +4806,7 @@ public:
                     // text from the non-first line sequence
                     first_line_sequance_end_reached = true;
                     // For the followup wrap position resolution, pretend we met a \n
-                    // after where first line sequence end
+                    // after where first line sequence ended
                     lastMandatoryWrap = i;
                     break;
                 }
@@ -5331,26 +5331,50 @@ public:
                     // We had a copy of the source text with CSS first-line styling,
                     // and we did not meet its end. We should fast forward skipping
                     // that first-line sequence, and once in the normal text sequence
-                    // (which include the the full text since the start of the paragraph)
-                    // skip the part that has just been output as first-line.
-                    // Skip from here until non-first-line-clone
+                    // (which includes the full text since the start of the paragraph)
+                    // skip the part that has just been output as first-line to restart
+                    // on after where we wrapped.
+                    // We initially assumed we would get the same text content in the
+                    // first-line sequence as in the normal text copy we get after it,
+                    // but when a list item marker is prepended, we do not.
+                    // So, get the node (a cloneNode) and offset at which we stopped on,
+                    // get its source node, and try to find it in the normal sequence:
+                    // we can then restart on it at the same offset/charindex.
+                    lUInt16 orig_offset = 0;
+                    ldomNode * orig_node = (ldomNode *) m_srcs[wrapPos]->object;
+                    if ( orig_node ) {
+                        orig_node = orig_node->getCloneNodeSource();
+                        orig_offset = m_charindex[wrapPos];
+                    }
+                    // First, skip from here until non-first-line-clone
                     int i = wrapPos;
                     while (i < m_length && m_srcs[i]->flags & LTEXT_IS_FIRST_LINE_CLONE)
                         i++;
-                    // We assume we got the same text content in the first-line sequence
-                    // as in the normal text copy we get after it.
-                    // (If this happens to not be true, the alternative is to get the node from
-                    // the srcline we stopped on (it is a cloneNode), get from it the node which
-                    // was the original source, and iterate to find the srcline having that node,
-                    // and skip the offset of it we had in the cloned source. With the risk
-                    // of not finding it if some generated content was there.) XXX see if needed
-                    // Move in the non-first-line as much as we walked until wrap in the first-line stream
-                    i += wrapPos;
+                    int normal_sequence_start = i; // in case !found
+                    bool found = false;
+                    if ( orig_node ) { // look for it
+                        while (i < m_length) {
+                            ldomNode * node = (ldomNode *) m_srcs[i]->object;
+                            if ( node == orig_node ) {
+                                if ( m_charindex[i] == orig_offset ) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            i++;
+                        }
+                    }
+                    if ( !found ) {
+                        // If we did not find it, go with our initial assumption:
+                        // move in the non-first-line as much as we walked until wrap
+                        // in the first-line sequence
+                        i = normal_sequence_start + wrapPos;
+                    }
                     // And use that as wrapPos for what follows.
                     wrapPos = i;
                     if (wrapPos >= m_length)
                         wrapPos = m_length-1;
-                    printf("first line done, moving from %d to %d\n", endp, i);
+                    // printf("first line done, moving from %d to %d (found=%d)\n", endp, i, found);
                 }
             }
 
@@ -6076,7 +6100,7 @@ void LFormattedText::Draw( LVDrawBuf * buf, int x, int y, ldomMarkedRangeList * 
                         if ( srcline->flags & LTEXT_HAS_TOP_BOTTOM_BORDER ) {
                             // Find out the nearest parent node that carries some border
                             ldomNode * tmp = node;
-                            if (tmp->isText())
+                            if (tmp->isEffectiveText())
                                 tmp = tmp->getParentNode();
                             while ( tmp && tmp->getRendMethod() != erm_final ) {
                                 int border = measureBorder(tmp, side);

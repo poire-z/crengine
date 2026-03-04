@@ -6341,24 +6341,15 @@ bool LVCssSelector::check( const ldomNode * node, bool allow_cache ) const
 {
     lUInt16 nodeId = node->getNodeId();
     
-    // Handle cloneNode elements: delegate checking to the original node
     if ( nodeId == el_cloneNode ) {
-        ldomNode * originalNode = const_cast<ldomNode*>(node)->getCloneNodeSource();
-        if ( !originalNode ) {
-            return false; // Invalid cloneNode
+        if ( node->isEffectiveText() ) {
+            return false; // text nodes don't match selectors
         }
-        
-        // If original is a text node, it doesn't match element selectors
-        if ( originalNode->isText() ) {
-            return false;
-        }
-        
-        // Check the selector against the original node
-        // This is more efficient as it checks the actual element and its ancestors
-        return check(originalNode, allow_cache);
-        // XXX could fall through
+        // Continue checking with the original node
+        node = node->getCloneNodeSource();
+        nodeId = node->getNodeId();
     }
-    else if ( nodeId == el_pseudoElem ) {
+    if ( nodeId == el_pseudoElem ) {
         if ( !_pseudo_elem ) { // not a ::before/after/first-letter/first-line rule
             // Our added pseudoElem element should not match any other rules
             // (if we added it as a child of a P element, it should not match P > *)
@@ -6547,8 +6538,7 @@ LVCssSelectorRule * parse_attr( const char * &str, lxmlDocBase * doc, bool usera
         // E:pseudo-class (eg: E:first-child)
         str++;
         if (*str==':') {
-            // pseudo element (double ::, eg: E::first-line): not supported here.
-            // Pseudo elements are handled in LVCssSelector::parse()
+            // pseudo element (double ::, eg: E::first-letter): are handled in LVCssSelector::parse()
             str--;
             return NULL;
         }
@@ -7016,13 +7006,15 @@ void LVCssSelector::applyToPseudoElement( const ldomNode * node, css_style_rec_t
     // once it has been created as a child (to which we should apply).
     css_style_rec_t * target_style = NULL;
     if ( node->getNodeId() == el_cloneNode ) {
+        // It masquerades as a pseudoElem: get the source pseudoElem for the following
+        // checks (the style remains the one of the cloneNode).
         node = node->getCloneNodeSource();
     }
     if ( node->getNodeId() == el_pseudoElem ) {
         if (    ( _pseudo_elem == csspe_before && node->hasAttribute(attr_Before) )
              || ( _pseudo_elem == csspe_after  && node->hasAttribute(attr_After)  )
              || ( _pseudo_elem == csspe_first_letter && node->hasAttribute(attr_FirstLetter) )
-             || ( _pseudo_elem == csspe_first_line    && node->hasAttribute(attr_FirstLine) ) ) {
+             || ( _pseudo_elem == csspe_first_line   && node->hasAttribute(attr_FirstLine)   ) ) {
             target_style = style;
         }
     }
@@ -7149,23 +7141,23 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
         return;
     }
     if ( id == el_cloneNode ) {
-        // For cloneNode, we need to get the original node's ID for selector matching,
-        // but apply styles to the cloneNode itself (not the original).
-        // The cloneNode needs its own style that inherits from ::first-line pseudoElem.
-        ldomNode * originalNode = const_cast<ldomNode*>(node)->getCloneNodeSource();
-        if ( !originalNode || originalNode->isText() ) {
-            return; // Invalid cloneNode or text node
+        // For cloneNode, we need to get the original node's id for selector matching,
+        // but apply styles to the cloneNode itself (not the source's style).
+        // (A cloneNode inherits the styles from its ancestor pseudoElem[FirstLine],
+        // which are overloaded by what is applied here).
+        if ( node->isEffectiveText() ) {
+            return; // text nodes don't get to be styled
         }
-        // Get the original element's ID and continue applying to this cloneNode
-        id = originalNode->getNodeId();
-        // Continue with selector matching using original's id, but apply to cloneNode
+        // Continue with selector matching using the source's id (but keep
+        // node (the cloneNode) and apply to its style)
+        id = node->getEffectiveNodeId();
     }
-//    else if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
     if ( id == el_pseudoElem ) { // get the id chain from the parent/originating element
         // Note that a "div:before {float:left}" will result in: <div><floatBox><pseudoElem>
-        if ( node->hasAttribute(attr_FirstLetter) ) {
+        // (Use *Effective* methods as a cloneNode can originate from a pseudoElem)
+        if ( node->hasEffectiveAttribute(attr_FirstLetter) ) {
             // For ::first-letter, find the ancestor with HasFirstLetter attribute
-            const ldomNode * ancestor = node->getUnboxedParent();
+            const ldomNode * ancestor = const_cast<ldomNode*>(node)->getEffectiveNode()->getUnboxedParent();
             while ( ancestor ) {
                 if ( ancestor->hasAttribute(attr_HasFirstLetter) ) {
                     id = ancestor->getNodeId();
@@ -7177,9 +7169,9 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
                 return;
             }
         }
-        else if ( node->hasAttribute(attr_FirstLine) ) {
+        else if ( node->hasEffectiveAttribute(attr_FirstLine) ) {
             // For ::first-line, find the ancestor with HasFirstLine attribute
-            const ldomNode * ancestor = node->getUnboxedParent();
+            const ldomNode * ancestor = const_cast<ldomNode*>(node)->getEffectiveNode()->getUnboxedParent();
             while ( ancestor ) {
                 if ( ancestor->hasAttribute(attr_HasFirstLine) ) {
                     id = ancestor->getNodeId();
@@ -7213,7 +7205,7 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
     LVCssSelector * selector_id = id>0 && id<_selectors.length() ? _selectors[id] : NULL;
 
     LVArray<lUInt32> class_hash_array;
-    const lString32 &v = node->getAttributeValue(attr_class);
+    const lString32 &v = node->getEffectiveAttributeValue(attr_class);
     for_each_split(v.c_str(), [&](const lChar32 *begin, const lChar32 *end) {
         class_hash_array.add(lString32::getHash(begin, end));
     });

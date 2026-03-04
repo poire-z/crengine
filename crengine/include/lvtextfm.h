@@ -78,7 +78,7 @@ extern "C" {
 #define LTEXT_SRC_IS_CLEAR_BOTH      0x03000000  // text follows <BR style="clear: both">
 #define LTEXT_SRC_IS_CLEAR_LAST      0x04000000  // ignorable text, added when nothing follows <BR style="clear: both">
 
-#define LTEXT_IS_FIRST_LINE_ENOUGH   0x04000000  // helper for renderFinalBlock (same bit as previous to not waste one)
+#define LTEXT_IS_FIRST_LINE_ENOUGH   0x04000000  // helper for renderFinalBlock (same bit as previous, no conflict the way each are used)
 #define LTEXT_IS_FIRST_LINE_CLONE    0x08000000  // text is duplicated for CSS ::first-line
 
 #define LTEXT_HAS_EXTRA              0x10000000  // Has extra properties (see below)
